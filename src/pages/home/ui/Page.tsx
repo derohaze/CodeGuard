@@ -1210,7 +1210,7 @@ export default function Page() {
               workspaceMode={workspaceMode}
             />
           )}
-          <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden pt-8">
             <AnimatePresence>
               {isSidebarCollapsed && (
                 <Tooltip delayDuration={0}>
