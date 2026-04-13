@@ -145,7 +145,7 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
     >
       <div className="mx-auto flex w-full max-w-[860px] flex-col items-center">
         <h2 className="text-center text-[30px] font-semibold tracking-[-0.03em] text-txt-primary">
-          Security analysis in progress
+          Analyzing your codebase security
         </h2>
 
         <p className="mt-3 max-w-[560px] text-center text-[15px] leading-7 text-txt-secondary">
@@ -157,7 +157,7 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
             <ProgressBarHeader>
               <Label className="inline-flex items-center gap-2">
                 {!isFailed && isActive && <Loader variant="spin" className="size-3.5 text-txt-primary" />}
-                {isFailed ? "Security analysis failed" : "Security analysis in progress"}
+                {isFailed ? "Security analysis failed" : "Codebase analysis in progress"}
               </Label>
               <ProgressBarValue />
             </ProgressBarHeader>

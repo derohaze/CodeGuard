@@ -90,12 +90,12 @@ describe("ScanProgressScreen", () => {
 
     render(<ScanProgressScreen session={session} />);
 
-    expect(screen.getByRole("heading", { name: "Security analysis in progress" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Analyzing your codebase security" })).toBeInTheDocument();
     expect(screen.getByText("Inspecting repository structure, data flow, and active review signals.")).toBeInTheDocument();
     expect(screen.getByText("Coverage pending")).toBeInTheDocument();
     expect(screen.getByText("Repository structure, dependency markers, and review metadata are being prepared.")).toBeInTheDocument();
 
-    expect(screen.queryByText("Analyzing your codebase")).not.toBeInTheDocument();
+    expect(screen.queryByText("Security analysis in progress")).not.toBeInTheDocument();
     expect(screen.queryByText(/trust boundaries, framework markers, sinks, and graph summaries/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Coverage starts during review")).not.toBeInTheDocument();
   });

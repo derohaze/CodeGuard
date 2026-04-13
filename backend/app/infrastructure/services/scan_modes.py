@@ -14,6 +14,10 @@ class ScanModeConfig:
     max_blocks_per_file: int
     max_path_units: int
     multi_pass: bool
+    validation_passes: int
+    validation_candidates_per_pass: int
+    fast_risk_budget_items: int
+    fast_per_file_limit: int
 
 
 SCAN_MODE_CONFIGS: dict[ScanMode, ScanModeConfig] = {
@@ -25,6 +29,10 @@ SCAN_MODE_CONFIGS: dict[ScanMode, ScanModeConfig] = {
         max_blocks_per_file=4,
         max_path_units=24,
         multi_pass=False,
+        validation_passes=1,
+        validation_candidates_per_pass=24,
+        fast_risk_budget_items=32,
+        fast_per_file_limit=3,
     ),
     "deep": ScanModeConfig(
         mode="deep",
@@ -34,6 +42,10 @@ SCAN_MODE_CONFIGS: dict[ScanMode, ScanModeConfig] = {
         max_blocks_per_file=9999,
         max_path_units=9999,
         multi_pass=True,
+        validation_passes=2,
+        validation_candidates_per_pass=48,
+        fast_risk_budget_items=9999,
+        fast_per_file_limit=9999,
     ),
 }
 

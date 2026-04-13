@@ -27,15 +27,27 @@ def build_scan_work_units(
 
     path_units = build_path_units(traced_paths, limit=config.max_path_units)
     if config.mode == "fast":
+        ranked_items = sorted(
+            base_items,
+            key=lambda item: (
+                -_review_item_priority(item),
+                -int(item.get("signal_score", 0) or 0),
+                str(item.get("file", "")),
+                int(item.get("start_line", 0) or 0),
+            ),
+        )
         trimmed = []
         file_counts: dict[str, int] = {}
-        for item in base_items:
+        for item in ranked_items:
             file_path = str(item.get("file", ""))
             next_count = file_counts.get(file_path, 0)
-            if next_count >= config.max_blocks_per_file:
+            per_file_limit = min(config.max_blocks_per_file, config.fast_per_file_limit)
+            if next_count >= per_file_limit:
                 continue
             file_counts[file_path] = next_count + 1
             trimmed.append(item)
+            if len(trimmed) >= config.fast_risk_budget_items:
+                break
             if len({entry["file"] for entry in trimmed}) >= config.max_hotspot_files and len(trimmed) >= config.max_hotspot_files * 2:
                 break
         review_items = trimmed
@@ -79,3 +91,28 @@ def _build_path_id(path: dict) -> str:
     sink = path.get("sink", {})
     source = path.get("source", {})
     return f"{source.get('file', 'unknown')}:{source.get('line', 0)}->{sink.get('file', 'unknown')}:{sink.get('line', 0)}"
+
+
+def _review_item_priority(item: dict) -> int:
+    score = int(item.get("signal_score", 0) or 0) * 3
+    review_focus = str(item.get("review_focus", "")).lower()
+    block_kind = str(item.get("block_kind", "")).lower()
+    rationale = str(item.get("rationale", "")).lower()
+    attack_surface = str(item.get("related_attack_surface", "")).lower()
+    path_type = str(item.get("path_type", "")).lower()
+
+    if path_type == "cross_file":
+        score += 18
+    elif path_type == "intra_file":
+        score += 9
+
+    if any(token in review_focus for token in ("command", "deserial", "query", "sql", "token", "auth")):
+        score += 12
+    if any(token in rationale for token in ("request entrypoint", "auth boundary", "subprocess", "query", "network")):
+        score += 8
+    if any(token in attack_surface for token in ("public", "api", "graphql", "auth", "admin")):
+        score += 6
+    if block_kind in {"function", "route", "handler"}:
+        score += 6
+
+    return score

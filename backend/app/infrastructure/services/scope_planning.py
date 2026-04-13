@@ -22,11 +22,14 @@ def build_scan_plan(
         "source_name": source_path.name,
         "source_path": str(source_path),
         "multi_pass": config.multi_pass,
+        "validation_passes": config.validation_passes,
         "coverage_target_percent": config.target_coverage,
         "work_unit_strategy": {
             "files": "full_traversal" if config.mode == "deep" else "prioritized_subset",
             "blocks": "all_blocks" if config.mode == "deep" else "hot_blocks",
             "paths": "all_candidate_paths" if config.mode == "deep" else "high_risk_paths",
+            "fast_risk_budget_items": config.fast_risk_budget_items,
+            "fast_per_file_limit": config.fast_per_file_limit,
         },
         "time_budget": {
             "effort": "high" if config.mode == "deep" else "medium",

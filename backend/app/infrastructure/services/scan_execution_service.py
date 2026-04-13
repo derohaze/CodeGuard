@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import logging
 from pathlib import Path
 import time
@@ -35,9 +36,14 @@ from app.infrastructure.services.scan_coverage import (
 )
 from app.infrastructure.services.scope_planning import build_scan_plan
 from app.infrastructure.services.score_calibration import calibrate_security_score
-from app.infrastructure.services.scan_identity import build_source_fingerprint
+from app.infrastructure.services.scan_identity import (
+    build_analysis_cache_key,
+    build_repository_snapshot_fingerprint,
+    build_source_fingerprint,
+)
 from app.infrastructure.services.scan_lock_manager import ScanLockLease, ScanLockManager
 from app.infrastructure.services.runtime_safety_policy import sanitize_runtime_error
+from app.infrastructure.services.scan_modes import ScanModeConfig, get_scan_mode_config
 from app.infrastructure.services.segmentation_planning import build_scan_work_units
 from app.infrastructure.services.risk_prioritization import prioritize_review_queue
 from app.infrastructure.services.source_sink_registry import build_source_sink_registry
@@ -80,6 +86,8 @@ def create_initial_session(source_path: str, target_type: str, preset: str, scan
 
 
 class ScanExecutionService:
+    _MAX_ANALYSIS_CACHE_ENTRIES = 8
+
     def __init__(
         self,
         repository: ScanSessionRepository,
@@ -93,6 +101,7 @@ class ScanExecutionService:
         self.job_repository = job_repository
         self.workflow_persistence = workflow_persistence
         self.scan_lock_manager = scan_lock_manager
+        self._analysis_cache: dict[str, dict] = {}
 
     async def submit(self, session_id: str, job_id: str | None = None) -> None:
         asyncio.create_task(self.run(session_id, job_id=job_id))
@@ -118,6 +127,7 @@ class ScanExecutionService:
             getattr(self.ai_client, "reset_runtime_state", lambda: None)()
             source = Path(session.source_path)
             source_root = source if source.is_dir() else source.parent
+            mode_config = get_scan_mode_config(session.scan_mode)
 
             if job_id and self.job_repository is not None:
                 await self._update_job(
@@ -171,11 +181,43 @@ class ScanExecutionService:
                 repository_profile=profile,
             )
             framework_profile = detect_framework_profile(source_root, files, profile)
-            repository_artifacts = build_repository_artifacts(source_root, files, profile)
-            repository_graph = build_repository_graph(source_root, files, framework_profile)
-            security_registry = build_source_sink_registry(source_root, files, framework_profile)
-            traced_paths = trace_candidate_paths(source_root, repository_graph, security_registry, files)
-            file_segments = build_file_segments(files, source_root, scan_mode=session.scan_mode)
+            snapshot_fingerprint = build_repository_snapshot_fingerprint(source_root, files)
+            source_fingerprint = session.source_fingerprint or build_source_fingerprint(
+                session.source_path,
+                session.target_type,
+            )
+            analysis_cache_key = build_analysis_cache_key(
+                source_fingerprint=source_fingerprint,
+                snapshot_fingerprint=snapshot_fingerprint,
+                scan_mode=session.scan_mode,
+                target_type=session.target_type,
+                preset=session.preset,
+            )
+            cached_analysis = self._get_cached_analysis(analysis_cache_key)
+            if cached_analysis is None:
+                repository_artifacts = build_repository_artifacts(source_root, files, profile)
+                repository_graph = build_repository_graph(source_root, files, framework_profile)
+                security_registry = build_source_sink_registry(source_root, files, framework_profile)
+                traced_paths = trace_candidate_paths(source_root, repository_graph, security_registry, files)
+                file_segments = build_file_segments(files, source_root, scan_mode=session.scan_mode)
+                self._set_cached_analysis(
+                    analysis_cache_key,
+                    {
+                        "repository_artifacts": repository_artifacts,
+                        "repository_graph": repository_graph,
+                        "security_registry": security_registry,
+                        "traced_paths": traced_paths,
+                        "file_segments": file_segments,
+                    },
+                )
+                logs.append("Built fresh repository graph and path-tracing artifacts.")
+            else:
+                repository_artifacts = cached_analysis["repository_artifacts"]
+                repository_graph = cached_analysis["repository_graph"]
+                security_registry = cached_analysis["security_registry"]
+                traced_paths = cached_analysis["traced_paths"]
+                file_segments = cached_analysis["file_segments"]
+                logs.append("Reused incremental analysis cache for repository graph and path tracing.")
             excluded_review_file_count = sum(1 for item in file_segments if int(item.get("block_count", 0)) == 0)
             heuristic_candidates = collect_heuristic_candidates(files, source_root)
             repository_inventory = build_repository_inventory(profile, files)
@@ -559,24 +601,17 @@ class ScanExecutionService:
                 ),
             )
 
-            try:
-                validated = await self.ai_client.validate_findings(
-                    project_name=session.repo,
-                    source_path=session.source_path,
-                    repository_profile=profile,
-                    repository_map={
-                        **repository_map,
-                        "framework_profile": framework_profile,
-                        "repository_graph_summary": repository_graph["summary"],
-                        "path_summary": traced_paths["summary"],
-                    },
-                    findings=candidate_findings,
-                    preset=session.preset,
-                )
-            except ExternalAIServiceError as exc:
-                logger.warning("AI validation failed; returning no validated findings", exc_info=exc)
-                logs.append("AI validation was unavailable; no findings were auto-validated.")
-                validated = {"review_note": "", "safe_summary": "", "findings": []}
+            validated = await self._run_validation_passes(
+                session=session,
+                profile=profile,
+                repository_map=repository_map,
+                framework_profile=framework_profile,
+                repository_graph=repository_graph,
+                traced_paths=traced_paths,
+                candidate_findings=candidate_findings,
+                mode_config=mode_config,
+                logs=logs,
+            )
             self._append_runtime_events(logs)
             merged_validated_findings = cluster_findings(merge_validated_findings(
                 validated.get("findings", []),
@@ -1027,6 +1062,90 @@ class ScanExecutionService:
             if any(token in lowered for token in ("provider", "model", "key", "cache", "fallback", "cool", "retry", "coalesced")):
                 continue
             logs.append(event)
+
+    def _get_cached_analysis(self, cache_key: str) -> dict | None:
+        payload = self._analysis_cache.get(cache_key)
+        if payload is None:
+            return None
+        return copy.deepcopy(payload)
+
+    def _set_cached_analysis(self, cache_key: str, payload: dict) -> None:
+        self._analysis_cache[cache_key] = copy.deepcopy(payload)
+        while len(self._analysis_cache) > self._MAX_ANALYSIS_CACHE_ENTRIES:
+            oldest_key = next(iter(self._analysis_cache))
+            del self._analysis_cache[oldest_key]
+
+    async def _run_validation_passes(
+        self,
+        *,
+        session: ScanSessionEntity,
+        profile: dict,
+        repository_map: dict,
+        framework_profile: dict,
+        repository_graph: dict,
+        traced_paths: dict,
+        candidate_findings: list[dict],
+        mode_config: ScanModeConfig,
+        logs: list[str],
+    ) -> dict:
+        validation_context = {
+            **repository_map,
+            "framework_profile": framework_profile,
+            "repository_graph_summary": repository_graph["summary"],
+            "path_summary": traced_paths["summary"],
+        }
+
+        try:
+            first_pass = await self.ai_client.validate_findings(
+                project_name=session.repo,
+                source_path=session.source_path,
+                repository_profile=profile,
+                repository_map=validation_context,
+                findings=candidate_findings,
+                preset=session.preset,
+            )
+        except ExternalAIServiceError as exc:
+            logger.warning("AI validation failed; returning no validated findings", exc_info=exc)
+            logs.append("AI validation was unavailable; no findings were auto-validated.")
+            return {"review_note": "", "safe_summary": "", "findings": []}
+
+        review_notes = [str(first_pass.get("review_note", "")).strip()]
+        merged_findings = list(first_pass.get("findings", []))
+
+        if mode_config.validation_passes > 1 and candidate_findings:
+            validated_keys = {build_candidate_key(item) for item in merged_findings}
+            second_pass_candidates = [
+                item
+                for item in candidate_findings
+                if build_candidate_key(item) not in validated_keys
+                and int(item.get("confidence", 0) or 0) >= 70
+                and not bool(item.get("has_sanitizer"))
+            ][: max(1, int(mode_config.validation_candidates_per_pass))]
+            if second_pass_candidates:
+                logs.append(
+                    f"Deep validation pass 2 is rechecking {len(second_pass_candidates)} high-signal candidates."
+                )
+                try:
+                    second_pass = await self.ai_client.validate_findings(
+                        project_name=session.repo,
+                        source_path=session.source_path,
+                        repository_profile=profile,
+                        repository_map=validation_context,
+                        findings=second_pass_candidates,
+                        preset=session.preset,
+                    )
+                    review_notes.append(str(second_pass.get("review_note", "")).strip())
+                    merged_findings.extend(second_pass.get("findings", []))
+                except ExternalAIServiceError as exc:
+                    logger.warning("Second validation pass failed; keeping first pass output", exc_info=exc)
+                    logs.append("Deep validation pass 2 was unavailable; continuing with pass 1 output.")
+
+        deduped_findings = cluster_findings(merged_findings)
+        return {
+            "review_note": " ".join(note for note in review_notes if note),
+            "safe_summary": str(first_pass.get("safe_summary", "")),
+            "findings": deduped_findings,
+        }
 
 
 def _build_scan_failure_message(exc: Exception) -> str:
