@@ -55,7 +55,8 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       className="flex min-h-0 flex-1 bg-surface"
     >
       <aside className="flex w-[272px] shrink-0 flex-col border-r bg-[#f7f2eb]" style={{ borderColor: "hsl(var(--border-soft))" }}>
-        <div className="app-drag flex h-11 items-center border-b px-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+        <div className="app-drag h-8 border-b" style={{ borderColor: "hsl(var(--border-soft))" }} />
+        <div className="flex h-12 items-center border-b px-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
           <button
             onClick={onBack}
             className="app-no-drag inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-txt-secondary transition-colors hover:bg-secondary hover:text-txt-primary"
