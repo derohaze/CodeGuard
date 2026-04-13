@@ -16,11 +16,7 @@ _TEXT_SUFFIX_ALLOWLIST = {
 
 def validate_provider_endpoints() -> None:
     settings = get_settings()
-    for provider, base_url in (
-        ("groq", settings.groq_base_url),
-        ("modal", settings.modal_base_url),
-        ("nvidia", settings.nvidia_base_url),
-    ):
+    for provider, base_url in (("nvidia", settings.nvidia_base_url),):
         if not base_url:
             continue
         ensure_allowed_outbound_url(base_url, provider=provider)

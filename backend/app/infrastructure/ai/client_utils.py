@@ -23,6 +23,10 @@ TASK_PROMPT_LIMITS = {
     ("fix_validate", "remediation_draft"): {"list_limit": 10, "string_limit": 420},
 }
 
+ALLOWED_FIX_TYPES = {"full_fix", "partial_mitigation", "temporary_guard", "risky_workaround"}
+ALLOWED_SECURITY_STRENGTH = {"high", "medium", "low"}
+ALLOWED_REGRESSION_RISK = {"low", "medium", "high"}
+
 
 def json_for_prompt(value, *, max_chars: int) -> str:
     compact = value
@@ -197,9 +201,20 @@ def compact_findings(findings: list[dict], limit: int) -> list[dict]:
 
 
 def normalize_fix_strategy(item: dict) -> dict:
+    if not isinstance(item, dict):
+        item = {}
     kind = str(item.get("kind", "guard")).strip().lower()
     if kind not in {"refactor", "guard", "sanitization"}:
         kind = "guard"
+    fix_type = str(item.get("fix_type", "partial_mitigation")).strip().lower()
+    if fix_type not in ALLOWED_FIX_TYPES:
+        fix_type = "partial_mitigation"
+    security_strength = str(item.get("security_strength", "medium")).strip().lower()
+    if security_strength not in ALLOWED_SECURITY_STRENGTH:
+        security_strength = "medium"
+    regression_risk = str(item.get("regression_risk", "medium")).strip().lower()
+    if regression_risk not in ALLOWED_REGRESSION_RISK:
+        regression_risk = "medium"
     return {
         "id": str(item.get("id", kind)),
         "label": str(item.get("label", "Fix strategy")),
@@ -211,9 +226,9 @@ def normalize_fix_strategy(item: dict) -> dict:
         "rationale": shorten(str(item.get("rationale", "")), width=320, placeholder="..."),
         "diff": str(item.get("diff", "")),
         "recommended": bool(item.get("recommended", False)),
-        "fix_type": str(item.get("fix_type", "partial_mitigation")),
-        "security_strength": str(item.get("security_strength", "medium")),
-        "regression_risk": str(item.get("regression_risk", "medium")),
+        "fix_type": fix_type,
+        "security_strength": security_strength,
+        "regression_risk": regression_risk,
         "selection_reason": shorten(str(item.get("selection_reason", "")), width=240, placeholder="..."),
         "non_selection_reason": shorten(str(item.get("non_selection_reason", "")), width=220, placeholder="..."),
         "residual_risks": [shorten(str(note), width=160, placeholder="...") for note in item.get("residual_risks", []) if str(note).strip()][:4],
@@ -233,6 +248,9 @@ def normalize_patch_candidate(item: dict) -> dict:
             "before_snippet": "",
             "after_snippet": "",
         }
+    fix_type = str(item.get("fix_type", "partial_mitigation")).strip().lower()
+    if fix_type not in ALLOWED_FIX_TYPES:
+        fix_type = "partial_mitigation"
     return {
         "file": str(item.get("file", "")),
         "language": str(item.get("language", "")),
@@ -241,11 +259,129 @@ def normalize_patch_candidate(item: dict) -> dict:
         "validation_notes": [str(note) for note in item.get("validation_notes", []) if str(note).strip()][:6],
         "before_snippet": str(item.get("before_snippet", "")),
         "after_snippet": str(item.get("after_snippet", "")),
-        "fix_type": str(item.get("fix_type", "partial_mitigation")),
+        "fix_type": fix_type,
         "rationale": shorten(str(item.get("rationale", "")), width=240, placeholder="..."),
         "residual_risks": [shorten(str(note), width=160, placeholder="...") for note in item.get("residual_risks", []) if str(note).strip()][:4],
         "manual_review_required": bool(item.get("manual_review_required", False)),
     }
+
+
+def normalize_remediation_payload(
+    parsed: dict,
+    *,
+    fallback_review_summary: str = "",
+    fallback_recommended_strategy_id: str | None = None,
+    fallback_strategies: list[dict] | None = None,
+    fallback_patch: dict | None = None,
+) -> dict:
+    parsed = parsed if isinstance(parsed, dict) else {}
+    fallback_strategies = fallback_strategies or []
+    fallback_patch = fallback_patch or {}
+
+    strategies = [
+        normalize_fix_strategy(item)
+        for item in parsed.get("strategies", fallback_strategies)
+        if isinstance(item, dict)
+    ]
+    recommended_strategy_id = str(
+        parsed.get("recommended_strategy_id", fallback_recommended_strategy_id or "")
+    ).strip() or None
+    strategies, recommended_strategy = _normalize_recommended_strategy(strategies, recommended_strategy_id)
+
+    patch_source = parsed.get("patch", fallback_patch)
+    patch = normalize_patch_candidate(patch_source)
+    top_level_validation_notes = [
+        str(item).strip()
+        for item in parsed.get("validation_notes", [])
+        if str(item).strip()
+    ][:6]
+    patch["validation_notes"] = _merge_unique_notes(
+        patch.get("validation_notes", []),
+        top_level_validation_notes,
+    )[:6]
+    if recommended_strategy is not None:
+        patch = _enrich_patch_from_strategy(patch, recommended_strategy)
+
+    return {
+        "review_summary": shorten(
+            str(parsed.get("review_summary", fallback_review_summary)),
+            width=280,
+            placeholder="...",
+        ),
+        "recommended_strategy_id": recommended_strategy["id"] if recommended_strategy is not None else None,
+        "strategies": strategies,
+        "patch": patch,
+    }
+
+
+def _normalize_recommended_strategy(
+    strategies: list[dict],
+    recommended_strategy_id: str | None,
+) -> tuple[list[dict], dict | None]:
+    if not strategies:
+        return [], None
+
+    selected_id = recommended_strategy_id
+    if selected_id is None:
+        selected = next((item for item in strategies if item.get("recommended")), None)
+        if selected is None:
+            selected = max(
+                strategies,
+                key=lambda item: (
+                    1 if item.get("policy_compliant") else 0,
+                    1 if item.get("fix_type") == "full_fix" else 0,
+                    1 if item.get("security_strength") == "high" else 0,
+                    int(item.get("confidence", 0)),
+                ),
+            )
+        selected_id = str(selected.get("id", "")).strip() or None
+
+    normalized: list[dict] = []
+    selected_strategy: dict | None = None
+    for item in strategies:
+        current = dict(item)
+        is_selected = selected_id is not None and str(current.get("id", "")).strip() == selected_id
+        current["recommended"] = is_selected
+        if is_selected:
+            selected_strategy = current
+        normalized.append(current)
+
+    if selected_strategy is None:
+        normalized[0]["recommended"] = True
+        selected_strategy = normalized[0]
+
+    return normalized, selected_strategy
+
+
+def _enrich_patch_from_strategy(patch: dict, strategy: dict) -> dict:
+    enriched = dict(patch)
+    if not str(enriched.get("fix_type", "")).strip() or enriched.get("fix_type") == "partial_mitigation":
+        enriched["fix_type"] = strategy.get("fix_type", "partial_mitigation")
+    if not str(enriched.get("rationale", "")).strip():
+        enriched["rationale"] = strategy.get("selection_reason") or strategy.get("rationale", "")
+    if not enriched.get("residual_risks"):
+        enriched["residual_risks"] = list(strategy.get("residual_risks", []))[:4]
+    if not enriched.get("manual_review_required"):
+        enriched["manual_review_required"] = (
+            strategy.get("fix_type") != "full_fix"
+            or strategy.get("regression_risk") == "high"
+            or not strategy.get("policy_compliant", True)
+        )
+    if strategy.get("policy_violations"):
+        enriched["validation_notes"] = _merge_unique_notes(
+            enriched.get("validation_notes", []),
+            strategy.get("policy_violations", []),
+        )[:6]
+    return enriched
+
+
+def _merge_unique_notes(base: list[str], extra: list[str]) -> list[str]:
+    merged: list[str] = []
+    for item in [*base, *extra]:
+        note = str(item).strip()
+        if note and note not in merged:
+            merged.append(note)
+    return merged
 
 
 def extract_review_payload(content: str) -> dict:

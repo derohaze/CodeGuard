@@ -9,7 +9,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.core.config import get_settings
 from app.infrastructure.ai.nvidia_security_client import NvidiaSecurityClient
-from app.infrastructure.ai.provider_factory import _build_provider
+from app.infrastructure.ai.provider_factory import _build_provider, build_ai_client
 
 
 class NvidiaProviderTests(unittest.TestCase):
@@ -54,6 +54,23 @@ class NvidiaProviderTests(unittest.TestCase):
         self.assertEqual(client.provider_name, "nvidia")
         self.assertEqual(client.model_router.route("repository_map"), "openai/gpt-oss-20b")
         self.assertEqual(client.model_router.route("finding_validate"), "openai/gpt-oss-120b")
+
+    def test_build_ai_client_rejects_non_nvidia_provider_order(self) -> None:
+        os.environ["NVIDIA_API_KEY"] = "test-key"
+        os.environ["AI_PROVIDER_ORDER"] = "other,nvidia"
+        get_settings.cache_clear()
+
+        with self.assertRaises(RuntimeError):
+            build_ai_client()
+
+    def test_build_ai_client_returns_nvidia_when_order_is_supported(self) -> None:
+        os.environ["NVIDIA_API_KEY"] = "test-key"
+        os.environ["AI_PROVIDER_ORDER"] = "nvidia"
+        get_settings.cache_clear()
+
+        client = build_ai_client()
+
+        self.assertIsInstance(client, NvidiaSecurityClient)
 
 
 if __name__ == "__main__":

@@ -44,8 +44,8 @@ class FakeRepository:
 class FailingAIClient:
     async def map_repository(self, **kwargs):
         raise ExternalAIServiceError(
-            "The configured Groq account is currently unavailable because billing is restricted. Update the Groq billing method and contact support, then retry the scan.",
-            provider="groq",
+            "NVIDIA is temporarily unavailable. Retry the scan shortly.",
+            provider="nvidia",
             retryable=False,
         )
 

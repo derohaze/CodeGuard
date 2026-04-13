@@ -13,8 +13,7 @@ from app.infrastructure.ai.client_utils import (
     extract_json,
     extract_review_payload,
     json_for_task_prompt,
-    normalize_fix_strategy,
-    normalize_patch_candidate,
+    normalize_remediation_payload,
     normalize_priority_path,
 )
 from app.infrastructure.ai.orchestration.model_router import ModelRouter
@@ -170,12 +169,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
                 {"role": "user", "content": f"Mode: {mode}\nRemediation context JSON: {json_for_task_prompt('fix_draft', 'remediation_context', remediation_context, max_chars=2800)}"},
             ],
         )
-        return {
-            "review_summary": shorten(str(parsed.get("review_summary", "")), width=280, placeholder="..."),
-            "recommended_strategy_id": str(parsed.get("recommended_strategy_id", "")).strip() or None,
-            "strategies": [normalize_fix_strategy(item) for item in parsed.get("strategies", []) if isinstance(item, dict)],
-            "patch": normalize_patch_candidate(parsed.get("patch", {})),
-        }
+        return normalize_remediation_payload(parsed)
 
     async def validate_remediation(self, remediation_context: dict, remediation_draft: dict, mode: str) -> dict:
         parsed = await self._chat_json(
@@ -193,17 +187,13 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
                 },
             ],
         )
-        strategies = [normalize_fix_strategy(item) for item in parsed.get("strategies", remediation_draft.get("strategies", [])) if isinstance(item, dict)]
-        patch = normalize_patch_candidate(parsed.get("patch", remediation_draft.get("patch", {})))
-        validation_notes = [str(item) for item in parsed.get("validation_notes", []) if str(item).strip()]
-        if validation_notes:
-            patch["validation_notes"] = validation_notes
-        return {
-            "review_summary": shorten(str(parsed.get("review_summary", remediation_draft.get("review_summary", ""))), width=280, placeholder="..."),
-            "recommended_strategy_id": str(parsed.get("recommended_strategy_id", remediation_draft.get("recommended_strategy_id") or "")).strip() or None,
-            "strategies": strategies,
-            "patch": patch,
-        }
+        return normalize_remediation_payload(
+            parsed,
+            fallback_review_summary=str(remediation_draft.get("review_summary", "")),
+            fallback_recommended_strategy_id=remediation_draft.get("recommended_strategy_id"),
+            fallback_strategies=remediation_draft.get("strategies", []),
+            fallback_patch=remediation_draft.get("patch", {}),
+        )
 
     async def _chat_json(self, *, task_name: str, max_tokens: int, messages: list[dict]) -> dict:
         token_budgets = [max_tokens]

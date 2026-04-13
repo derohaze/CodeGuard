@@ -830,7 +830,7 @@ class ScanExecutionService:
             if not event:
                 continue
             lowered = event.lower()
-            if any(token in lowered for token in ("groq", "modal", "nvidia", "provider", "model", "key", "cache", "fallback", "cool", "retry", "coalesced")):
+            if any(token in lowered for token in ("provider", "model", "key", "cache", "fallback", "cool", "retry", "coalesced")):
                 continue
             logs.append(event)
 
