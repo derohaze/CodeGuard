@@ -28,6 +28,7 @@ from app.infrastructure.services.remediation_tuning import (
     extract_failure_case,
 )
 from app.infrastructure.services.workflow_persistence import WorkflowPersistenceService
+from app.infrastructure.settings.runtime_settings_service import RuntimeSettingsService
 
 
 class GenerateFixUseCase:
@@ -36,11 +37,13 @@ class GenerateFixUseCase:
         repository: ScanSessionRepository,
         agent_router: RemediationRouter,
         workflow_persistence: WorkflowPersistenceService | None = None,
+        runtime_settings_service: RuntimeSettingsService | None = None,
     ) -> None:
         self.repository = repository
         self.agent_router = agent_router
         self.feedback_store = RemediationFeedbackStore()
         self.workflow_persistence = workflow_persistence
+        self.runtime_settings_service = runtime_settings_service
 
     async def execute(self, payload: GenerateFixRequest) -> RemediationPlanResponse | None:
         session = await self.repository.get_by_id(payload.session_id)
@@ -89,8 +92,15 @@ class GenerateFixUseCase:
         previous_failures = self.feedback_store.get_recent_failures(category)
         best_plan: RemediationPlanEntity | None = None
         excluded_ids: list[str] = []
+        max_attempts = 3
+        reuse_explanation = True
+        if self.runtime_settings_service is not None:
+            runtime_settings = await self.runtime_settings_service.get()
+            max_attempts = max(1, min(5, int(runtime_settings.remediation_max_attempts)))
+            reuse_explanation = bool(runtime_settings.remediation_reuse_explanation)
+        explanation_cache: dict | None = None
         attempt = 1
-        while attempt <= 3:
+        while attempt <= max_attempts:
             current_context = build_tuning_context(
                 base_context=context,
                 category=category,
@@ -100,7 +110,14 @@ class GenerateFixUseCase:
             )
             if best_plan:
                 current_context["retry"]["attempted_strategy_ids"] = [item.id for item in best_plan.strategies]
-            plan = await self._run_generation(current_context, finding_id=finding_id, mode=mode)
+            plan, generated_explanation = await self._run_generation(
+                current_context,
+                finding_id=finding_id,
+                mode=mode,
+                explanation_override=explanation_cache if reuse_explanation else None,
+            )
+            if reuse_explanation and explanation_cache is None:
+                explanation_cache = generated_explanation
             best_plan = plan if best_plan is None else choose_better_plan(best_plan, plan)
             decision = evaluate_tuning_need(best_plan)
             if not decision.should_retry:
@@ -113,19 +130,38 @@ class GenerateFixUseCase:
 
         if best_plan and best_plan.score and best_plan.score.total < 70:
             self.feedback_store.record_failure(extract_failure_case(plan=best_plan, context=context))
-        return best_plan if best_plan is not None else await self._run_generation(context, finding_id=finding_id, mode=mode)
+        if best_plan is not None:
+            return best_plan
+        return (
+            await self._run_generation(
+                context,
+                finding_id=finding_id,
+                mode=mode,
+                explanation_override=explanation_cache if reuse_explanation else None,
+            )
+        )[0]
 
-    async def _run_generation(self, context: dict, *, finding_id: str, mode: str) -> RemediationPlanEntity:
+    async def _run_generation(
+        self,
+        context: dict,
+        *,
+        finding_id: str,
+        mode: str,
+        explanation_override: dict | None = None,
+    ) -> tuple[RemediationPlanEntity, dict]:
         await self.agent_router.start_run(context, mode)
-        explanation = await self.agent_router.explain(context, mode=mode)
+        explanation = explanation_override or await self.agent_router.explain(context, mode=mode)
         remediation = await self.agent_router.generate_fix(context, mode=mode)
-        return _build_plan_entity(
-            finding_id,
+        return (
+            _build_plan_entity(
+                finding_id,
+                explanation,
+                remediation,
+                context,
+                await self.agent_router.build_trace(context, mode),
+                mode=mode,
+            ),
             explanation,
-            remediation,
-            context,
-            await self.agent_router.build_trace(context, mode),
-            mode=mode,
         )
 
 

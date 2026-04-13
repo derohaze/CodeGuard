@@ -23,6 +23,7 @@ import { PolicyCenterScreen } from "@/features/policy-center";
 import { FindingDetailPanel } from "@/features/review-finding";
 import { ScanEmptyScreen, ScanProgressScreen, ScanResultsScreen } from "@/features/scan-project";
 import { SettingsScreen } from "@/features/settings";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, resolveMotionDuration, useRuntimeSettings } from "@/features/settings/model/runtimeSettings";
 import { Sidebar } from "@/features/sidebar-navigation";
 import { SuggestFixScreen } from "@/features/suggest-fix";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -129,6 +130,14 @@ export default function Page() {
   const [serviceExposureSummary, setServiceExposureSummary] = useState<WorkflowServiceExposureSummary | null>(null);
   const [serviceExposureFeed, setServiceExposureFeed] = useState<WorkflowServiceExposureItem[] | null>(null);
   const {
+    settings: runtimeSettings,
+    isLoading: runtimeSettingsLoading,
+    isSaving: runtimeSettingsSaving,
+    patchSettings: patchRuntimeSettings,
+  } = useRuntimeSettings();
+  const shellMotionDuration = resolveMotionDuration(0.18, runtimeSettings.motionProfile);
+  const contentMotionDuration = resolveMotionDuration(0.1, runtimeSettings.motionProfile);
+  const {
     activeConversation,
     activeConversationId,
     addAttachment,
@@ -233,6 +242,38 @@ export default function Page() {
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.dataset.themeMode = runtimeSettings.theme;
+    root.dataset.surfaceContrast = runtimeSettings.surfaceContrast;
+    root.dataset.motionProfile = runtimeSettings.motionProfile;
+  }, [runtimeSettings.motionProfile, runtimeSettings.surfaceContrast, runtimeSettings.theme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!runtimeSettings.rememberSidebarState) {
+      window.localStorage.removeItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+      setIsSidebarCollapsed(false);
+      return;
+    }
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+    if (stored === "1") {
+      setIsSidebarCollapsed(true);
+      return;
+    }
+    if (stored === "0") {
+      setIsSidebarCollapsed(false);
+    }
+  }, [runtimeSettings.rememberSidebarState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !runtimeSettings.rememberSidebarState) {
+      return;
+    }
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, isSidebarCollapsed ? "1" : "0");
+  }, [isSidebarCollapsed, runtimeSettings.rememberSidebarState]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -406,6 +447,7 @@ export default function Page() {
   }, [activeSession, activeSessionId, mergeSessionSummary, screen]);
 
   useEffect(() => {
+    if (!runtimeSettings.autoOpenResults) return;
     if (!pendingCompletionSessionId || activeSession?.session.id !== pendingCompletionSessionId) return;
     if (activeSession.session.progress < 100) return;
 
@@ -415,7 +457,13 @@ export default function Page() {
     }, 450);
 
     return () => window.clearTimeout(timer);
-  }, [activeSession, pendingCompletionSessionId]);
+  }, [activeSession, pendingCompletionSessionId, runtimeSettings.autoOpenResults]);
+
+  useEffect(() => {
+    if (!runtimeSettings.autoOpenResults && pendingCompletionSessionId) {
+      setPendingCompletionSessionId(null);
+    }
+  }, [pendingCompletionSessionId, runtimeSettings.autoOpenResults]);
 
   const handleStartScan = useCallback(async (payload: StartScanPayload) => {
     try {
@@ -959,7 +1007,14 @@ export default function Page() {
   const renderContent = () => {
     switch (screen) {
       case "home":
-        return <HomeScreen key="home" onStartScan={handleStartScan} />;
+        return (
+          <HomeScreen
+            key="home"
+            onStartScan={handleStartScan}
+            defaultPreset={runtimeSettings.defaultPreset}
+            defaultScanMode={runtimeSettings.defaultScanMode}
+          />
+        );
       case "scan-empty":
         return <ScanEmptyScreen key="scan-empty" onStartScan={() => setScreen("home")} />;
       case "scan-progress":
@@ -1147,7 +1202,14 @@ export default function Page() {
           />
         );
       default:
-        return <HomeScreen key="home" onStartScan={handleStartScan} />;
+        return (
+          <HomeScreen
+            key="home"
+            onStartScan={handleStartScan}
+            defaultPreset={runtimeSettings.defaultPreset}
+            defaultScanMode={runtimeSettings.defaultScanMode}
+          />
+        );
     }
   };
 
@@ -1158,7 +1220,7 @@ export default function Page() {
           key="workspace-view"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: shellMotionDuration, ease: [0.22, 1, 0.36, 1] }}
           className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
         >
           {workspaceMode === "security" ? (
@@ -1220,7 +1282,7 @@ export default function Page() {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      transition={{ duration: shellMotionDuration, ease: "easeOut" }}
                       onClick={() => setIsSidebarCollapsed(false)}
                       className="app-no-drag absolute left-4 top-4 z-40 rounded-xl border bg-card p-2 text-txt-secondary shadow-sm transition-colors hover:bg-secondary hover:text-txt-primary"
                       style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -1247,7 +1309,7 @@ export default function Page() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.1, ease: "linear" }}
+                  transition={{ duration: contentMotionDuration, ease: "linear" }}
                   className="flex min-h-0 min-w-0 flex-1"
                 >
                   {renderContent()}
@@ -1258,7 +1320,7 @@ export default function Page() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.1, ease: "linear" }}
+                  transition={{ duration: contentMotionDuration, ease: "linear" }}
                   className="flex min-h-0 min-w-0 flex-1"
                 >
                   <BuilderChatScreen
@@ -1291,7 +1353,19 @@ export default function Page() {
           </div>
         </motion.div>
       ) : (
-        <SettingsScreen onBack={() => setView("workspace")} />
+        <SettingsScreen
+          onBack={() => setView("workspace")}
+          settings={runtimeSettings}
+          isSaving={runtimeSettingsSaving || runtimeSettingsLoading}
+          onPatchSettings={async (patch) => {
+            try {
+              await patchRuntimeSettings(patch);
+            } catch (error) {
+              const message = error instanceof Error ? toAnalystCopy(error.message) : "Unable to save runtime settings.";
+              toast.error(message);
+            }
+          }}
+        />
       )}
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => {
         if (!open && !isDeleting) {

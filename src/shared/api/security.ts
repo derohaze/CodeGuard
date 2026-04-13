@@ -10,6 +10,37 @@ export interface StartScanPayload {
   scanMode: "fast" | "deep";
 }
 
+export interface RuntimeSettings {
+  defaultPreset: "safe" | "balanced" | "aggressive";
+  defaultScanMode: "fast" | "deep";
+  autoOpenResults: boolean;
+  rememberSidebarState: boolean;
+  motionProfile: "fluid" | "reduced" | "instant";
+  theme: "light" | "system";
+  surfaceContrast: "soft" | "standard";
+  remediationMaxAttempts: number;
+  remediationReuseExplanation: boolean;
+  externalIngestionMaxRps: number;
+  externalIngestionRetryAttempts: number;
+  externalIngestionBackoffSeconds: number;
+  updatedAt: string;
+}
+
+export interface UpdateRuntimeSettingsPayload {
+  defaultPreset?: "safe" | "balanced" | "aggressive";
+  defaultScanMode?: "fast" | "deep";
+  autoOpenResults?: boolean;
+  rememberSidebarState?: boolean;
+  motionProfile?: "fluid" | "reduced" | "instant";
+  theme?: "light" | "system";
+  surfaceContrast?: "soft" | "standard";
+  remediationMaxAttempts?: number;
+  remediationReuseExplanation?: boolean;
+  externalIngestionMaxRps?: number;
+  externalIngestionRetryAttempts?: number;
+  externalIngestionBackoffSeconds?: number;
+}
+
 export interface ScanSessionDetail {
   session: Session;
   issues: {
@@ -157,6 +188,33 @@ export async function startScan(payload: StartScanPayload): Promise<ScanSessionD
 export async function getScanSession(sessionId: string): Promise<ScanSessionDetail> {
   const data = await request<ScanSessionDetailApiResponse>(`/scans/${sessionId}`);
   return mapScanSessionDetail(data);
+}
+
+export async function getRuntimeSettings(): Promise<RuntimeSettings> {
+  const data = await request<RuntimeSettingsApiResponse>("/settings/runtime");
+  return mapRuntimeSettings(data);
+}
+
+export async function updateRuntimeSettings(payload: UpdateRuntimeSettingsPayload): Promise<RuntimeSettings> {
+  const body: Record<string, unknown> = {};
+  if (payload.defaultPreset !== undefined) body.default_preset = payload.defaultPreset;
+  if (payload.defaultScanMode !== undefined) body.default_scan_mode = payload.defaultScanMode;
+  if (payload.autoOpenResults !== undefined) body.auto_open_results = payload.autoOpenResults;
+  if (payload.rememberSidebarState !== undefined) body.remember_sidebar_state = payload.rememberSidebarState;
+  if (payload.motionProfile !== undefined) body.motion_profile = payload.motionProfile;
+  if (payload.theme !== undefined) body.theme = payload.theme;
+  if (payload.surfaceContrast !== undefined) body.surface_contrast = payload.surfaceContrast;
+  if (payload.remediationMaxAttempts !== undefined) body.remediation_max_attempts = payload.remediationMaxAttempts;
+  if (payload.remediationReuseExplanation !== undefined) body.remediation_reuse_explanation = payload.remediationReuseExplanation;
+  if (payload.externalIngestionMaxRps !== undefined) body.external_ingestion_max_rps = payload.externalIngestionMaxRps;
+  if (payload.externalIngestionRetryAttempts !== undefined) body.external_ingestion_retry_attempts = payload.externalIngestionRetryAttempts;
+  if (payload.externalIngestionBackoffSeconds !== undefined) body.external_ingestion_backoff_seconds = payload.externalIngestionBackoffSeconds;
+
+  const data = await request<RuntimeSettingsApiResponse>("/settings/runtime", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return mapRuntimeSettings(data);
 }
 
 export function subscribeToScanEvents(
@@ -715,6 +773,24 @@ function mapRemediationExecution(data: RemediationExecutionApiResponse): Remedia
   };
 }
 
+function mapRuntimeSettings(data: RuntimeSettingsApiResponse): RuntimeSettings {
+  return {
+    defaultPreset: data.default_preset,
+    defaultScanMode: data.default_scan_mode,
+    autoOpenResults: data.auto_open_results,
+    rememberSidebarState: data.remember_sidebar_state,
+    motionProfile: data.motion_profile,
+    theme: data.theme,
+    surfaceContrast: data.surface_contrast,
+    remediationMaxAttempts: data.remediation_max_attempts,
+    remediationReuseExplanation: data.remediation_reuse_explanation,
+    externalIngestionMaxRps: data.external_ingestion_max_rps,
+    externalIngestionRetryAttempts: data.external_ingestion_retry_attempts,
+    externalIngestionBackoffSeconds: data.external_ingestion_backoff_seconds,
+    updatedAt: data.updated_at,
+  };
+}
+
 function mapWorkflowRepoIntelligenceSummary(
   data: WorkflowRepoIntelligenceSummaryApiResponse,
 ): WorkflowRepoIntelligenceSummary {
@@ -1087,6 +1163,22 @@ interface RemediationExecutionApiResponse {
   session: SessionApiResponse;
   findings: FindingApiResponse[];
   candidate_findings: FindingApiResponse[];
+}
+
+interface RuntimeSettingsApiResponse {
+  default_preset: RuntimeSettings["defaultPreset"];
+  default_scan_mode: RuntimeSettings["defaultScanMode"];
+  auto_open_results: boolean;
+  remember_sidebar_state: boolean;
+  motion_profile: RuntimeSettings["motionProfile"];
+  theme: RuntimeSettings["theme"];
+  surface_contrast: RuntimeSettings["surfaceContrast"];
+  remediation_max_attempts: number;
+  remediation_reuse_explanation: boolean;
+  external_ingestion_max_rps: number;
+  external_ingestion_retry_attempts: number;
+  external_ingestion_backoff_seconds: number;
+  updated_at: string;
 }
 
 interface WorkflowRepoIntelligenceSummaryApiResponse {

@@ -23,6 +23,7 @@ from app.infrastructure.database.collections import (
     NORMALIZATION_FAILURES_COLLECTION,
     REPORT_EXPORTS_COLLECTION,
     REQUIRED_COLLECTIONS,
+    RUNTIME_SETTINGS_COLLECTION,
     SCAN_JOBS_COLLECTION,
     SCAN_SESSIONS_COLLECTION,
     VERIFICATION_RUNS_COLLECTION,
@@ -186,6 +187,9 @@ async def ensure_mongo_indexes() -> None:
     await ingestion_audit.create_index([("audit_id", 1)], name="ux_ingestion_audit_audit_id", unique=True)
     await ingestion_audit.create_index([("run_id", 1), ("created_at", DESCENDING)], name="idx_ingestion_audit_run_created_at_desc")
     await ingestion_audit.create_index([("source_name", 1), ("created_at", DESCENDING)], name="idx_ingestion_audit_source_created_at_desc")
+
+    runtime_settings = database[RUNTIME_SETTINGS_COLLECTION]
+    await runtime_settings.create_index([("updated_at", DESCENDING)], name="idx_runtime_settings_updated_at_desc")
 
 
 def ensure_artifacts_directory() -> Path:

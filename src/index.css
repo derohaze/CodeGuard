@@ -61,6 +61,29 @@
     --status-progress: 20 58% 58%;
     --status-disabled: 30 3% 54%;
   }
+
+  :root[data-surface-contrast="standard"] {
+    --surface: 40 33% 96%;
+    --surface-sidebar: 34 20% 92%;
+    --surface-secondary: 37 27% 94%;
+    --surface-dot: 33 16% 84%;
+  }
+
+  :root[data-theme-mode="system"] {
+    color-scheme: light;
+  }
+
+  :root[data-motion-profile="reduced"] .scan-grid,
+  :root[data-motion-profile="instant"] .scan-grid {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+
+  :root[data-motion-profile="reduced"] .scan-grid::before,
+  :root[data-motion-profile="instant"] .scan-grid::before {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
 }
 
 @layer base {

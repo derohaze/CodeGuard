@@ -131,6 +131,56 @@ class FakeAgentRouter:
         }
 
 
+class StaticRuntimeSettingsService:
+    def __init__(self, *, remediation_max_attempts: int, remediation_reuse_explanation: bool) -> None:
+        self.remediation_max_attempts = remediation_max_attempts
+        self.remediation_reuse_explanation = remediation_reuse_explanation
+
+    async def get(self):
+        return self
+
+
+class RetryingAgentRouter(FakeAgentRouter):
+    def __init__(self) -> None:
+        self.explain_calls = 0
+        self.fix_calls = 0
+
+    async def explain(self, remediation_context: dict, *, mode: str = "single") -> dict:
+        self.explain_calls += 1
+        return await super().explain(remediation_context, mode=mode)
+
+    async def generate_fix(self, remediation_context: dict, mode: str) -> dict:
+        self.fix_calls += 1
+        strategy_id = f"guard-{self.fix_calls}"
+        return {
+            "review_summary": f"Retry candidate {self.fix_calls}",
+            "recommended_strategy_id": strategy_id,
+            "strategies": [
+                {
+                    "id": strategy_id,
+                    "label": "Guard-only remediation",
+                    "kind": "guard",
+                    "confidence": 62,
+                    "impact": "low",
+                    "effort": "low",
+                    "summary": "Adds a shallow guard before the sink.",
+                    "rationale": "Temporary stop-gap control.",
+                    "diff": "--- a/app/features/login/router.py\n+++ b/app/features/login/router.py\n@@\n+if \"'\" in email:\n+    raise ValueError(\"invalid email\")",
+                    "recommended": True,
+                }
+            ],
+            "patch": {
+                "file": "app/features/login/router.py",
+                "language": "python",
+                "summary": "Guard-only patch candidate.",
+                "diff": "--- a/app/features/login/router.py\n+++ b/app/features/login/router.py\n@@\n+if \"'\" in email:\n+    raise ValueError(\"invalid email\")",
+                "validation_notes": ["Guard-only strategy candidate."],
+                "before_snippet": "query = f\"SELECT * FROM users WHERE email = '{email}'\"",
+                "after_snippet": "if \"'\" in email:\n    raise ValueError(\"invalid email\")",
+            },
+        }
+
+
 class RemediationUseCaseTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -231,6 +281,40 @@ class RemediationUseCaseTests(unittest.TestCase):
         self.assertGreaterEqual(response.metrics.analyzed_lines, 1)
         self.assertEqual(response.metrics.path_steps, 2)
         self.assertEqual(len(response.steps), 5)
+
+    def test_generate_fix_reuses_explanation_when_enabled(self):
+        router = RetryingAgentRouter()
+        use_case = GenerateFixUseCase(
+            self.repository,
+            router,
+            runtime_settings_service=StaticRuntimeSettingsService(
+                remediation_max_attempts=2,
+                remediation_reuse_explanation=True,
+            ),
+        )
+
+        response = asyncio.run(use_case.execute(GenerateFixRequest(session_id="session-1", finding_id="finding-1")))
+
+        self.assertIsNotNone(response)
+        self.assertEqual(router.fix_calls, 2)
+        self.assertEqual(router.explain_calls, 1)
+
+    def test_generate_fix_calls_explain_each_attempt_when_reuse_is_disabled(self):
+        router = RetryingAgentRouter()
+        use_case = GenerateFixUseCase(
+            self.repository,
+            router,
+            runtime_settings_service=StaticRuntimeSettingsService(
+                remediation_max_attempts=2,
+                remediation_reuse_explanation=False,
+            ),
+        )
+
+        response = asyncio.run(use_case.execute(GenerateFixRequest(session_id="session-1", finding_id="finding-1")))
+
+        self.assertIsNotNone(response)
+        self.assertEqual(router.fix_calls, 2)
+        self.assertEqual(router.explain_calls, 2)
 
     def test_generate_fix_does_not_apply_patch_before_approval(self):
         original = self.file_path.read_text(encoding="utf-8")

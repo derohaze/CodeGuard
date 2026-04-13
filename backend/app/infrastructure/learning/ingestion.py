@@ -22,6 +22,7 @@ from app.infrastructure.learning.ingestion_validation import (
 from app.infrastructure.learning.normalization import normalize_external_item
 from app.infrastructure.learning.repository import LearningArchiveMongoRepository
 from app.infrastructure.learning.schemas import ExternalKnowledgeSourceSpec
+from app.infrastructure.settings.runtime_settings_service import RuntimeSettingsService
 
 
 logger = logging.getLogger("codeguard.learning.ingestion")
@@ -47,22 +48,33 @@ class HttpExternalSourceFetcher:
         self._guard = asyncio.Lock()
         self._last_request_at = 0.0
 
-    async def fetch(self, endpoint: str, *, requests_per_second: int | None = None) -> str:
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            for attempt in range(1, self.retry_attempts + 1):
+    async def fetch(
+        self,
+        endpoint: str,
+        *,
+        requests_per_second: int | None = None,
+        retry_attempts: int | None = None,
+        backoff_seconds: float | None = None,
+        timeout_seconds: float | None = None,
+    ) -> str:
+        active_timeout = float(timeout_seconds or self.timeout_seconds)
+        active_retry_attempts = max(1, int(retry_attempts or self.retry_attempts))
+        active_backoff = float(backoff_seconds or self.backoff_seconds)
+        async with httpx.AsyncClient(timeout=active_timeout) as client:
+            for attempt in range(1, active_retry_attempts + 1):
                 try:
                     await self._respect_rate_limit(requests_per_second=requests_per_second)
                     response = await client.get(endpoint)
                     response.raise_for_status()
                     return response.text
                 except httpx.HTTPStatusError as exc:
-                    if attempt >= self.retry_attempts or exc.response.status_code < 500:
+                    if attempt >= active_retry_attempts or exc.response.status_code < 500:
                         raise
-                    await asyncio.sleep(self._backoff_delay(attempt))
+                    await asyncio.sleep(self._backoff_delay(attempt, active_backoff))
                 except httpx.HTTPError:
-                    if attempt >= self.retry_attempts:
+                    if attempt >= active_retry_attempts:
                         raise
-                    await asyncio.sleep(self._backoff_delay(attempt))
+                    await asyncio.sleep(self._backoff_delay(attempt, active_backoff))
         raise RuntimeError("External ingestion failed after retries.")
 
     async def _respect_rate_limit(self, *, requests_per_second: int | None = None) -> None:
@@ -75,9 +87,9 @@ class HttpExternalSourceFetcher:
                 await asyncio.sleep(minimum_interval - elapsed)
             self._last_request_at = time.monotonic()
 
-    def _backoff_delay(self, attempt: int) -> float:
+    def _backoff_delay(self, attempt: int, base_backoff_seconds: float) -> float:
         # Exponential backoff with lightweight jitter.
-        return self.backoff_seconds * (2 ** (attempt - 1)) + (0.1 * attempt)
+        return float(base_backoff_seconds) * (2 ** (attempt - 1)) + (0.1 * attempt)
 
 
 class ExternalKnowledgeIngestionService:
@@ -85,9 +97,11 @@ class ExternalKnowledgeIngestionService:
         self,
         repository: LearningArchiveMongoRepository,
         fetcher: HttpExternalSourceFetcher | None = None,
+        runtime_settings_service: RuntimeSettingsService | None = None,
     ) -> None:
         self.repository = repository
         self.fetcher = fetcher or HttpExternalSourceFetcher()
+        self.runtime_settings_service = runtime_settings_service
 
     async def ingest(self, sources: list[ExternalKnowledgeSourceSpec]) -> IngestionSummary:
         run_id = f"ingest_{uuid4().hex}"
@@ -95,15 +109,22 @@ class ExternalKnowledgeIngestionService:
         skipped = 0
         failed = 0
         logger.info("learning_ingestion_started", extra={"run_id": run_id, "source_count": len(sources)})
+        runtime_settings = await self.runtime_settings_service.get() if self.runtime_settings_service is not None else None
+        runtime_max_rps = int(runtime_settings.external_ingestion_max_rps) if runtime_settings is not None else None
+        runtime_retry_attempts = int(runtime_settings.external_ingestion_retry_attempts) if runtime_settings is not None else None
+        runtime_backoff_seconds = float(runtime_settings.external_ingestion_backoff_seconds) if runtime_settings is not None else None
 
         for source in sources:
             source_name = source.source_name.strip().lower()
             try:
                 validate_external_source_spec(source)
                 await self.repository.upsert_external_source(source.model_dump())
+                effective_requests_per_second = source.requests_per_second or runtime_max_rps
                 raw_text = await self.fetcher.fetch(
                     source.endpoint,
-                    requests_per_second=source.requests_per_second,
+                    requests_per_second=effective_requests_per_second,
+                    retry_attempts=runtime_retry_attempts,
+                    backoff_seconds=runtime_backoff_seconds,
                 )
                 raw_cache_ref = await self.repository.cache_external_raw_payload(
                     ingestion_run_id=run_id,
@@ -171,7 +192,9 @@ class ExternalKnowledgeIngestionService:
                         "raw_payload_checksum": text_checksum(raw_text),
                         "parser_name": parsed_payload.parser_name,
                         "parser_warnings": parsed_payload.warnings,
-                        "rate_limit_rps": source.requests_per_second or getattr(self.fetcher, "max_requests_per_second", None),
+                        "rate_limit_rps": effective_requests_per_second or getattr(self.fetcher, "max_requests_per_second", None),
+                        "retry_attempts": runtime_retry_attempts or getattr(self.fetcher, "retry_attempts", None),
+                        "backoff_seconds": runtime_backoff_seconds or getattr(self.fetcher, "backoff_seconds", None),
                         "written_items": item_written,
                         "skipped_items": item_skipped,
                         "failed_items": item_failed,

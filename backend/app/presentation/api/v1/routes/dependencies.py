@@ -11,6 +11,7 @@ from app.application.use_cases.generate_fix import GenerateFixUseCase
 from app.application.use_cases.ingest_external_knowledge import IngestExternalKnowledgeUseCase
 from app.application.use_cases.get_scan_job import GetScanJobUseCase
 from app.application.use_cases.get_session import GetSessionUseCase
+from app.application.use_cases.get_runtime_settings import GetRuntimeSettingsUseCase
 from app.application.use_cases.get_workflow_repo_hotspots import GetWorkflowRepoHotspotsUseCase
 from app.application.use_cases.get_workflow_repo_intelligence_summary import GetWorkflowRepoIntelligenceSummaryUseCase
 from app.application.use_cases.get_workflow_service_exposure_feed import GetWorkflowServiceExposureFeedUseCase
@@ -24,6 +25,7 @@ from app.application.use_cases.retry_fix_strategy import RetryFixStrategyUseCase
 from app.application.use_cases.run_learning_benchmarks import RunLearningBenchmarksUseCase
 from app.application.use_cases.search_external_knowledge import SearchExternalKnowledgeUseCase
 from app.application.use_cases.start_scan import StartScanUseCase
+from app.application.use_cases.update_runtime_settings import UpdateRuntimeSettingsUseCase
 from app.application.ports.scan_job_dispatcher import ScanJobDispatcher
 from app.core.config import get_settings
 from app.infrastructure.ai.agents.explain_agent import ExplainAgent
@@ -44,6 +46,8 @@ from app.infrastructure.learning.archive import SecurityLearningArchiveService
 from app.infrastructure.learning.benchmark import LearningBenchmarkService
 from app.infrastructure.learning.ingestion import ExternalKnowledgeIngestionService, HttpExternalSourceFetcher
 from app.infrastructure.learning.repository import LearningArchiveMongoRepository
+from app.infrastructure.settings.runtime_settings_repository import RuntimeSettingsRepository
+from app.infrastructure.settings.runtime_settings_service import RuntimeSettingsService
 from app.infrastructure.services.runtime_safety_policy import validate_provider_endpoints
 from app.infrastructure.services.scan_lock_manager import ScanLockManager
 from app.infrastructure.services.scan_execution_service import ScanExecutionService
@@ -94,10 +98,21 @@ def get_external_source_fetcher() -> HttpExternalSourceFetcher:
 
 
 @lru_cache
+def get_runtime_settings_repository() -> RuntimeSettingsRepository:
+    return RuntimeSettingsRepository()
+
+
+@lru_cache
+def get_runtime_settings_service() -> RuntimeSettingsService:
+    return RuntimeSettingsService(get_runtime_settings_repository())
+
+
+@lru_cache
 def get_external_knowledge_ingestion_service() -> ExternalKnowledgeIngestionService:
     return ExternalKnowledgeIngestionService(
         repository=get_learning_repository(),
         fetcher=get_external_source_fetcher(),
+        runtime_settings_service=get_runtime_settings_service(),
     )
 
 
@@ -209,7 +224,12 @@ def get_explain_finding_use_case() -> ExplainFindingUseCase:
 
 
 def get_generate_fix_use_case() -> GenerateFixUseCase:
-    return GenerateFixUseCase(get_repository(), get_remediation_router(), get_workflow_persistence_service())
+    return GenerateFixUseCase(
+        get_repository(),
+        get_remediation_router(),
+        get_workflow_persistence_service(),
+        get_runtime_settings_service(),
+    )
 
 
 def get_generate_batch_remediation_use_case() -> GenerateBatchRemediationUseCase:
@@ -250,3 +270,11 @@ def get_record_feedback_event_use_case() -> RecordFeedbackEventUseCase:
 
 def get_run_learning_benchmarks_use_case() -> RunLearningBenchmarksUseCase:
     return RunLearningBenchmarksUseCase(get_learning_benchmark_service())
+
+
+def get_runtime_settings_use_case() -> GetRuntimeSettingsUseCase:
+    return GetRuntimeSettingsUseCase(get_runtime_settings_service())
+
+
+def get_update_runtime_settings_use_case() -> UpdateRuntimeSettingsUseCase:
+    return UpdateRuntimeSettingsUseCase(get_runtime_settings_service())

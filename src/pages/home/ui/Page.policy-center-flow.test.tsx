@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import Page from "./Page";
 
-const { listSessionsMock, getScanSessionMock } = vi.hoisted(() => ({
+const { listSessionsMock, getScanSessionMock, getRuntimeSettingsMock, updateRuntimeSettingsMock } = vi.hoisted(() => ({
   listSessionsMock: vi.fn(),
   getScanSessionMock: vi.fn(),
+  getRuntimeSettingsMock: vi.fn(),
+  updateRuntimeSettingsMock: vi.fn(),
 }));
 
 function stripMotionProps(props: Record<string, unknown>) {
@@ -123,6 +125,8 @@ vi.mock("@/shared/api/security", async () => {
     ...actual,
     listSessions: listSessionsMock,
     getScanSession: getScanSessionMock,
+    getRuntimeSettings: getRuntimeSettingsMock,
+    updateRuntimeSettings: updateRuntimeSettingsMock,
     startScan: vi.fn(),
     subscribeToScanEvents: vi.fn(() => vi.fn()),
     applyFix: vi.fn(),
@@ -157,6 +161,36 @@ describe("Page policy center flow", () => {
     vi.clearAllMocks();
     listSessionsMock.mockResolvedValue([buildSessionSummary()]);
     getScanSessionMock.mockResolvedValue(buildSessionDetail());
+    getRuntimeSettingsMock.mockResolvedValue({
+      defaultPreset: "balanced",
+      defaultScanMode: "deep",
+      autoOpenResults: true,
+      rememberSidebarState: true,
+      motionProfile: "fluid",
+      theme: "light",
+      surfaceContrast: "soft",
+      remediationMaxAttempts: 3,
+      remediationReuseExplanation: true,
+      externalIngestionMaxRps: 10,
+      externalIngestionRetryAttempts: 3,
+      externalIngestionBackoffSeconds: 0.5,
+      updatedAt: "2026-04-14T00:00:00Z",
+    });
+    updateRuntimeSettingsMock.mockResolvedValue({
+      defaultPreset: "balanced",
+      defaultScanMode: "deep",
+      autoOpenResults: true,
+      rememberSidebarState: true,
+      motionProfile: "fluid",
+      theme: "light",
+      surfaceContrast: "soft",
+      remediationMaxAttempts: 3,
+      remediationReuseExplanation: true,
+      externalIngestionMaxRps: 10,
+      externalIngestionRetryAttempts: 3,
+      externalIngestionBackoffSeconds: 0.5,
+      updatedAt: "2026-04-14T00:00:00Z",
+    });
   });
 
   it("routes from finding detail to decision center to policy center and shows pre-merge guidance", async () => {

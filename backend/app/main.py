@@ -10,7 +10,7 @@ from app.infrastructure.database.mongo import close_mongo, initialize_mongo
 from app.infrastructure.database.mongo_manager import ensure_backend_bootstrap
 from app.infrastructure.learning.bootstrap import ensure_learning_bootstrap
 from app.infrastructure.queue.redis import close_redis, initialize_redis
-from app.presentation.api.v1.routes import health, learning, remediation, scans, sessions
+from app.presentation.api.v1.routes import health, learning, remediation, scans, sessions, settings as settings_routes
 
 
 settings = get_settings()
@@ -43,4 +43,5 @@ app.include_router(scans.router, prefix="/api/v1", tags=["scans"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(remediation.router, prefix="/api/v1", tags=["remediation"])
 app.include_router(learning.router, prefix="/api/v1", tags=["learning"])
+app.include_router(settings_routes.router, prefix="/api/v1", tags=["settings"])
 register_error_handlers(app)

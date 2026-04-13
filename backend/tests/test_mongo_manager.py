@@ -54,6 +54,8 @@ class MongoManagerTests(unittest.TestCase):
         normalization_failures.create_index = AsyncMock()
         ingestion_audit = MagicMock()
         ingestion_audit.create_index = AsyncMock()
+        runtime_settings = MagicMock()
+        runtime_settings.create_index = AsyncMock()
         database = {
             "scan_sessions": scan_sessions,
             "scan_jobs": scan_jobs,
@@ -74,6 +76,7 @@ class MongoManagerTests(unittest.TestCase):
             "feedback_events": feedback_events,
             "normalization_failures": normalization_failures,
             "ingestion_audit": ingestion_audit,
+            "runtime_settings": runtime_settings,
         }
         with patch("app.infrastructure.database.mongo_manager.get_database", return_value=database):
             asyncio.run(ensure_mongo_indexes())
@@ -119,6 +122,7 @@ class MongoManagerTests(unittest.TestCase):
             "feedback_events",
             "normalization_failures",
             "ingestion_audit",
+            "runtime_settings",
         ):
             collection = MagicMock()
             collection.create_index = AsyncMock()

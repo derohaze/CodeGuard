@@ -8,9 +8,11 @@ import { Loader } from "@/shared/ui/Loader";
 
 interface HomeScreenProps {
   onStartScan: (payload: StartScanPayload) => void | Promise<void>;
+  defaultPreset?: "safe" | "balanced" | "aggressive";
+  defaultScanMode?: "fast" | "deep";
 }
 
-export function HomeScreen({ onStartScan }: HomeScreenProps) {
+export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: HomeScreenProps) {
   const {
     canBrowse,
     clearRecentSources,
@@ -33,7 +35,10 @@ export function HomeScreen({ onStartScan }: HomeScreenProps) {
     setTargetType,
     targetPath,
     targetType,
-  } = useHomeScreen();
+  } = useHomeScreen({
+    preset: defaultPreset ?? "balanced",
+    scanMode: defaultScanMode ?? "deep",
+  });
 
   const handleStart = () => {
     if (loading || !targetPath) return;

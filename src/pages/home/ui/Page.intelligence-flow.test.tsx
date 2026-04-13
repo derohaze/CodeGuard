@@ -12,6 +12,8 @@ const {
   getTeamPostureFeedMock,
   getServiceExposureSummaryMock,
   getServiceExposureFeedMock,
+  getRuntimeSettingsMock,
+  updateRuntimeSettingsMock,
 } = vi.hoisted(() => ({
   listSessionsMock: vi.fn(),
   getScanSessionMock: vi.fn(),
@@ -21,6 +23,8 @@ const {
   getTeamPostureFeedMock: vi.fn(),
   getServiceExposureSummaryMock: vi.fn(),
   getServiceExposureFeedMock: vi.fn(),
+  getRuntimeSettingsMock: vi.fn(),
+  updateRuntimeSettingsMock: vi.fn(),
 }));
 
 function stripMotionProps(props: Record<string, unknown>) {
@@ -144,6 +148,8 @@ vi.mock("@/shared/api/security", async () => {
     getTeamPostureFeed: getTeamPostureFeedMock,
     getServiceExposureSummary: getServiceExposureSummaryMock,
     getServiceExposureFeed: getServiceExposureFeedMock,
+    getRuntimeSettings: getRuntimeSettingsMock,
+    updateRuntimeSettings: updateRuntimeSettingsMock,
     startScan: vi.fn(),
     subscribeToScanEvents: vi.fn(() => vi.fn()),
     applyFix: vi.fn(),
@@ -221,6 +227,36 @@ describe("Page intelligence flow", () => {
       topServices: { api: 1 },
     });
     getServiceExposureFeedMock.mockResolvedValue([]);
+    getRuntimeSettingsMock.mockResolvedValue({
+      defaultPreset: "balanced",
+      defaultScanMode: "deep",
+      autoOpenResults: true,
+      rememberSidebarState: true,
+      motionProfile: "fluid",
+      theme: "light",
+      surfaceContrast: "soft",
+      remediationMaxAttempts: 3,
+      remediationReuseExplanation: true,
+      externalIngestionMaxRps: 10,
+      externalIngestionRetryAttempts: 3,
+      externalIngestionBackoffSeconds: 0.5,
+      updatedAt: "2026-04-14T00:00:00Z",
+    });
+    updateRuntimeSettingsMock.mockResolvedValue({
+      defaultPreset: "balanced",
+      defaultScanMode: "deep",
+      autoOpenResults: true,
+      rememberSidebarState: true,
+      motionProfile: "fluid",
+      theme: "light",
+      surfaceContrast: "soft",
+      remediationMaxAttempts: 3,
+      remediationReuseExplanation: true,
+      externalIngestionMaxRps: 10,
+      externalIngestionRetryAttempts: 3,
+      externalIngestionBackoffSeconds: 0.5,
+      updatedAt: "2026-04-14T00:00:00Z",
+    });
   });
 
   it("navigates from audit trail to governance, analytics, and repo overview through the real app flow", async () => {

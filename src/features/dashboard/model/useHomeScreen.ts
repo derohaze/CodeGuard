@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   inferWorkspace,
   RECENT_SOURCES_KEY,
@@ -25,15 +25,26 @@ const scanPresets = [
   },
 ] as const;
 
-export function useHomeScreen() {
+type HomeScreenDefaults = {
+  preset: (typeof scanPresets)[number]["id"];
+  scanMode: "fast" | "deep";
+};
+
+export function useHomeScreen(defaults?: HomeScreenDefaults) {
+  const resolvedDefaults: HomeScreenDefaults = {
+    preset: defaults?.preset ?? "balanced",
+    scanMode: defaults?.scanMode ?? "deep",
+  };
   const canBrowse = typeof window !== "undefined" && typeof window.electronAPI?.pickPath === "function";
-  const [preset, setPreset] = useState<(typeof scanPresets)[number]["id"]>("balanced");
-  const [scanMode, setScanMode] = useState<"fast" | "deep">("deep");
+  const [preset, setPresetState] = useState<(typeof scanPresets)[number]["id"]>(resolvedDefaults.preset);
+  const [scanMode, setScanModeState] = useState<"fast" | "deep">(resolvedDefaults.scanMode);
   const [targetType, setTargetType] = useState<SourceTargetType>("folder");
   const [targetPath, setTargetPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [pickingPath, setPickingPath] = useState(false);
   const [recentSources, setRecentSources] = useState<RecentSource[]>([]);
+  const userChangedPresetRef = useRef(false);
+  const userChangedModeRef = useRef(false);
 
   const selectedPreset = scanPresets.find((item) => item.id === preset) ?? scanPresets[1];
   const inferredWorkspace = useMemo(() => inferWorkspace(targetPath, targetType), [targetPath, targetType]);
@@ -63,6 +74,15 @@ export function useHomeScreen() {
       setRecentSources([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!userChangedPresetRef.current) {
+      setPresetState(resolvedDefaults.preset);
+    }
+    if (!userChangedModeRef.current) {
+      setScanModeState(resolvedDefaults.scanMode);
+    }
+  }, [resolvedDefaults.preset, resolvedDefaults.scanMode]);
 
   const persistRecentSources = (nextSources: RecentSource[]) => {
     setRecentSources(nextSources);
@@ -97,6 +117,16 @@ export function useHomeScreen() {
     } finally {
       setPickingPath(false);
     }
+  };
+
+  const setPreset = (value: (typeof scanPresets)[number]["id"]) => {
+    userChangedPresetRef.current = true;
+    setPresetState(value);
+  };
+
+  const setScanMode = (value: "fast" | "deep") => {
+    userChangedModeRef.current = true;
+    setScanModeState(value);
   };
 
   return {
