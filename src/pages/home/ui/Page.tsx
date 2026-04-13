@@ -403,7 +403,7 @@ export default function Page() {
         window.clearTimeout(livePollTimer);
       }
     };
-  }, [activeSession?.session.status, activeSessionId, mergeSessionSummary, screen]);
+  }, [activeSession, activeSessionId, mergeSessionSummary, screen]);
 
   useEffect(() => {
     if (!pendingCompletionSessionId || activeSession?.session.id !== pendingCompletionSessionId) return;
@@ -1291,7 +1291,7 @@ export default function Page() {
           </div>
         </motion.div>
       ) : (
-        <SettingsScreen onClose={() => setView("workspace")} />
+        <SettingsScreen onBack={() => setView("workspace")} />
       )}
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => {
         if (!open && !isDeleting) {
