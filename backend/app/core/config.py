@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     global_concurrent_scans_limit: int = Field(default=4, alias="GLOBAL_CONCURRENT_SCANS_LIMIT")
     session_scan_lock_ttl_seconds: int = Field(default=1800, alias="SESSION_SCAN_LOCK_TTL_SECONDS")
     source_scan_lock_ttl_seconds: int = Field(default=1800, alias="SOURCE_SCAN_LOCK_TTL_SECONDS")
+    learning_chunk_size_chars: int = Field(default=8192, alias="LEARNING_CHUNK_SIZE_CHARS")
+    learning_prose_chunk_overlap_chars: int = Field(default=256, alias="LEARNING_PROSE_CHUNK_OVERLAP_CHARS")
+    external_ingestion_max_rps: int = Field(default=10, alias="EXTERNAL_INGESTION_MAX_RPS")
+    external_ingestion_retry_attempts: int = Field(default=3, alias="EXTERNAL_INGESTION_RETRY_ATTEMPTS")
+    external_ingestion_backoff_seconds: float = Field(default=0.5, alias="EXTERNAL_INGESTION_BACKOFF_SECONDS")
+    external_ingestion_timeout_seconds: float = Field(default=30.0, alias="EXTERNAL_INGESTION_TIMEOUT_SECONDS")
     artifacts_dir: str = Field(
         default=str(Path(__file__).resolve().parents[2] / "artifacts"),
         alias="ARTIFACTS_DIR",

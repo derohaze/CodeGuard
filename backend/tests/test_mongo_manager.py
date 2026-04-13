@@ -30,6 +30,30 @@ class MongoManagerTests(unittest.TestCase):
         audit_events.create_index = AsyncMock()
         report_exports = MagicMock()
         report_exports.create_index = AsyncMock()
+        learning_archive_runs = MagicMock()
+        learning_archive_runs.create_index = AsyncMock()
+        learning_archive_items = MagicMock()
+        learning_archive_items.create_index = AsyncMock()
+        learning_archive_chunks = MagicMock()
+        learning_archive_chunks.create_index = AsyncMock()
+        external_knowledge_sources = MagicMock()
+        external_knowledge_sources.create_index = AsyncMock()
+        external_knowledge_items = MagicMock()
+        external_knowledge_items.create_index = AsyncMock()
+        external_knowledge_chunks = MagicMock()
+        external_knowledge_chunks.create_index = AsyncMock()
+        benchmark_suites = MagicMock()
+        benchmark_suites.create_index = AsyncMock()
+        benchmark_cases = MagicMock()
+        benchmark_cases.create_index = AsyncMock()
+        benchmark_runs = MagicMock()
+        benchmark_runs.create_index = AsyncMock()
+        feedback_events = MagicMock()
+        feedback_events.create_index = AsyncMock()
+        normalization_failures = MagicMock()
+        normalization_failures.create_index = AsyncMock()
+        ingestion_audit = MagicMock()
+        ingestion_audit.create_index = AsyncMock()
         database = {
             "scan_sessions": scan_sessions,
             "scan_jobs": scan_jobs,
@@ -38,6 +62,18 @@ class MongoManagerTests(unittest.TestCase):
             "verification_runs": verification_runs,
             "audit_events": audit_events,
             "report_exports": report_exports,
+            "learning_archive_runs": learning_archive_runs,
+            "learning_archive_items": learning_archive_items,
+            "learning_archive_chunks": learning_archive_chunks,
+            "external_knowledge_sources": external_knowledge_sources,
+            "external_knowledge_items": external_knowledge_items,
+            "external_knowledge_chunks": external_knowledge_chunks,
+            "benchmark_suites": benchmark_suites,
+            "benchmark_cases": benchmark_cases,
+            "benchmark_runs": benchmark_runs,
+            "feedback_events": feedback_events,
+            "normalization_failures": normalization_failures,
+            "ingestion_audit": ingestion_audit,
         }
         with patch("app.infrastructure.database.mongo_manager.get_database", return_value=database):
             asyncio.run(ensure_mongo_indexes())
@@ -55,6 +91,8 @@ class MongoManagerTests(unittest.TestCase):
         self.assertIn("idx_scan_jobs_source_status_created_at_desc", scan_job_index_names)
         finding_index_names = [call.kwargs.get("name") for call in findings.create_index.call_args_list]
         self.assertIn("ux_findings_session_kind_finding_id", finding_index_names)
+        benchmark_case_index_names = [call.kwargs.get("name") for call in benchmark_cases.create_index.call_args_list]
+        self.assertIn("ux_benchmark_cases_suite_fingerprint", benchmark_case_index_names)
 
     def test_backend_bootstrap_creates_missing_collections(self):
         database = MagicMock()
@@ -69,6 +107,18 @@ class MongoManagerTests(unittest.TestCase):
             "verification_runs",
             "audit_events",
             "report_exports",
+            "learning_archive_runs",
+            "learning_archive_items",
+            "learning_archive_chunks",
+            "external_knowledge_sources",
+            "external_knowledge_items",
+            "external_knowledge_chunks",
+            "benchmark_suites",
+            "benchmark_cases",
+            "benchmark_runs",
+            "feedback_events",
+            "normalization_failures",
+            "ingestion_audit",
         ):
             collection = MagicMock()
             collection.create_index = AsyncMock()

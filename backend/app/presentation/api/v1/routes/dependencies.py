@@ -3,10 +3,12 @@ from functools import lru_cache
 from app.application.use_cases.delete_all_sessions import DeleteAllSessionsUseCase
 from app.application.use_cases.delete_session import DeleteSessionUseCase
 from app.application.use_cases.apply_fix import ApplyFixUseCase
+from app.application.use_cases.archive_learning_session import ArchiveLearningSessionUseCase
 from app.application.use_cases.rollback_fix import RollbackFixUseCase
 from app.application.use_cases.explain_finding import ExplainFindingUseCase
 from app.application.use_cases.generate_batch_remediation import GenerateBatchRemediationUseCase
 from app.application.use_cases.generate_fix import GenerateFixUseCase
+from app.application.use_cases.ingest_external_knowledge import IngestExternalKnowledgeUseCase
 from app.application.use_cases.get_scan_job import GetScanJobUseCase
 from app.application.use_cases.get_session import GetSessionUseCase
 from app.application.use_cases.get_workflow_repo_hotspots import GetWorkflowRepoHotspotsUseCase
@@ -17,7 +19,10 @@ from app.application.use_cases.get_workflow_team_posture_feed import GetWorkflow
 from app.application.use_cases.get_workflow_team_posture_summary import GetWorkflowTeamPostureSummaryUseCase
 from app.application.use_cases.list_sessions import ListSessionsUseCase
 from app.application.use_cases.reject_fix import RejectFixUseCase
+from app.application.use_cases.record_feedback_event import RecordFeedbackEventUseCase
 from app.application.use_cases.retry_fix_strategy import RetryFixStrategyUseCase
+from app.application.use_cases.run_learning_benchmarks import RunLearningBenchmarksUseCase
+from app.application.use_cases.search_external_knowledge import SearchExternalKnowledgeUseCase
 from app.application.use_cases.start_scan import StartScanUseCase
 from app.application.ports.scan_job_dispatcher import ScanJobDispatcher
 from app.core.config import get_settings
@@ -35,6 +40,10 @@ from app.infrastructure.repositories.mongo_audit_event_repository import MongoAu
 from app.infrastructure.repositories.mongo_scan_job_repository import MongoScanJobRepository
 from app.infrastructure.repositories.mongo_scan_repository import MongoScanSessionRepository
 from app.infrastructure.repositories.mongo_verification_run_repository import MongoVerificationRunRepository
+from app.infrastructure.learning.archive import SecurityLearningArchiveService
+from app.infrastructure.learning.benchmark import LearningBenchmarkService
+from app.infrastructure.learning.ingestion import ExternalKnowledgeIngestionService, HttpExternalSourceFetcher
+from app.infrastructure.learning.repository import LearningArchiveMongoRepository
 from app.infrastructure.services.runtime_safety_policy import validate_provider_endpoints
 from app.infrastructure.services.scan_lock_manager import ScanLockManager
 from app.infrastructure.services.scan_execution_service import ScanExecutionService
@@ -72,6 +81,38 @@ def get_workflow_persistence_service() -> WorkflowPersistenceService:
 @lru_cache
 def get_scan_lock_manager() -> ScanLockManager:
     return ScanLockManager()
+
+
+@lru_cache
+def get_learning_repository() -> LearningArchiveMongoRepository:
+    return LearningArchiveMongoRepository()
+
+
+@lru_cache
+def get_external_source_fetcher() -> HttpExternalSourceFetcher:
+    return HttpExternalSourceFetcher()
+
+
+@lru_cache
+def get_external_knowledge_ingestion_service() -> ExternalKnowledgeIngestionService:
+    return ExternalKnowledgeIngestionService(
+        repository=get_learning_repository(),
+        fetcher=get_external_source_fetcher(),
+    )
+
+
+@lru_cache
+def get_security_learning_archive_service() -> SecurityLearningArchiveService:
+    return SecurityLearningArchiveService(
+        session_repository=get_repository(),
+        scan_job_repository=get_scan_job_repository(),
+        learning_repository=get_learning_repository(),
+    )
+
+
+@lru_cache
+def get_learning_benchmark_service() -> LearningBenchmarkService:
+    return LearningBenchmarkService(get_learning_repository())
 
 
 @lru_cache
@@ -189,3 +230,23 @@ def get_retry_fix_strategy_use_case() -> RetryFixStrategyUseCase:
 
 def get_rollback_fix_use_case() -> RollbackFixUseCase:
     return RollbackFixUseCase(get_repository(), get_workflow_persistence_service())
+
+
+def get_archive_learning_session_use_case() -> ArchiveLearningSessionUseCase:
+    return ArchiveLearningSessionUseCase(get_security_learning_archive_service())
+
+
+def get_ingest_external_knowledge_use_case() -> IngestExternalKnowledgeUseCase:
+    return IngestExternalKnowledgeUseCase(get_external_knowledge_ingestion_service())
+
+
+def get_search_external_knowledge_use_case() -> SearchExternalKnowledgeUseCase:
+    return SearchExternalKnowledgeUseCase(get_learning_repository())
+
+
+def get_record_feedback_event_use_case() -> RecordFeedbackEventUseCase:
+    return RecordFeedbackEventUseCase(get_learning_repository())
+
+
+def get_run_learning_benchmarks_use_case() -> RunLearningBenchmarksUseCase:
+    return RunLearningBenchmarksUseCase(get_learning_benchmark_service())

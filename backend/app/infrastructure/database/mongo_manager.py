@@ -7,8 +7,20 @@ from pymongo import DESCENDING
 from app.core.config import get_settings
 from app.infrastructure.database.collections import (
     AUDIT_EVENTS_COLLECTION,
+    BENCHMARK_CASES_COLLECTION,
+    BENCHMARK_RUNS_COLLECTION,
+    BENCHMARK_SUITES_COLLECTION,
+    EXTERNAL_KNOWLEDGE_CHUNKS_COLLECTION,
+    EXTERNAL_KNOWLEDGE_ITEMS_COLLECTION,
+    EXTERNAL_KNOWLEDGE_SOURCES_COLLECTION,
+    FEEDBACK_EVENTS_COLLECTION,
     FINDINGS_COLLECTION,
     FIX_SUGGESTIONS_COLLECTION,
+    INGESTION_AUDIT_COLLECTION,
+    LEARNING_ARCHIVE_CHUNKS_COLLECTION,
+    LEARNING_ARCHIVE_ITEMS_COLLECTION,
+    LEARNING_ARCHIVE_RUNS_COLLECTION,
+    NORMALIZATION_FAILURES_COLLECTION,
     REPORT_EXPORTS_COLLECTION,
     REQUIRED_COLLECTIONS,
     SCAN_JOBS_COLLECTION,
@@ -85,6 +97,95 @@ async def ensure_mongo_indexes() -> None:
 
     report_exports = database[REPORT_EXPORTS_COLLECTION]
     await report_exports.create_index([("session_id", 1), ("created_at", DESCENDING)], name="idx_report_exports_session_created_at_desc")
+
+    learning_archive_runs = database[LEARNING_ARCHIVE_RUNS_COLLECTION]
+    await learning_archive_runs.create_index([("run_id", 1)], name="ux_learning_archive_runs_run_id", unique=True)
+    await learning_archive_runs.create_index([("created_at", DESCENDING)], name="idx_learning_archive_runs_created_at_desc")
+    await learning_archive_runs.create_index([("status", 1), ("created_at", DESCENDING)], name="idx_learning_archive_runs_status_created_at_desc")
+
+    learning_archive_items = database[LEARNING_ARCHIVE_ITEMS_COLLECTION]
+    await learning_archive_items.create_index([("item_id", 1)], name="ux_learning_archive_items_item_id", unique=True)
+    await learning_archive_items.create_index(
+        [("record_type", 1), ("content_fingerprint", 1)],
+        name="ux_learning_archive_items_record_fingerprint",
+        unique=True,
+    )
+    await learning_archive_items.create_index([("run_id", 1), ("created_at", DESCENDING)], name="idx_learning_archive_items_run_created_at_desc")
+    await learning_archive_items.create_index([("status", 1), ("created_at", DESCENDING)], name="idx_learning_archive_items_status_created_at_desc")
+    await learning_archive_items.create_index([("language", 1), ("framework", 1)], name="idx_learning_archive_items_lang_framework")
+    await learning_archive_items.create_index([("vulnerability_category", 1)], name="idx_learning_archive_items_vulnerability_category")
+    await learning_archive_items.create_index([("repository_fingerprint", 1)], name="idx_learning_archive_items_repository_fingerprint")
+
+    learning_archive_chunks = database[LEARNING_ARCHIVE_CHUNKS_COLLECTION]
+    await learning_archive_chunks.create_index([("chunk_id", 1)], name="ux_learning_archive_chunks_chunk_id", unique=True)
+    await learning_archive_chunks.create_index(
+        [("parent_item_id", 1), ("sequence", 1)],
+        name="ux_learning_archive_chunks_parent_sequence",
+        unique=True,
+    )
+
+    external_sources = database[EXTERNAL_KNOWLEDGE_SOURCES_COLLECTION]
+    await external_sources.create_index(
+        [("source_name", 1), ("source_version", 1)],
+        name="ux_external_knowledge_sources_name_version",
+        unique=True,
+    )
+    await external_sources.create_index([("updated_at", DESCENDING)], name="idx_external_knowledge_sources_updated_at_desc")
+
+    external_items = database[EXTERNAL_KNOWLEDGE_ITEMS_COLLECTION]
+    await external_items.create_index([("item_id", 1)], name="ux_external_knowledge_items_item_id", unique=True)
+    await external_items.create_index(
+        [("source_name", 1), ("source_version", 1), ("item_fingerprint", 1)],
+        name="ux_external_knowledge_items_source_fingerprint",
+        unique=True,
+    )
+    await external_items.create_index([("language", 1), ("framework", 1)], name="idx_external_knowledge_items_lang_framework")
+    await external_items.create_index([("vulnerability_category", 1)], name="idx_external_knowledge_items_vulnerability_category")
+    await external_items.create_index([("weakness_id", 1)], name="idx_external_knowledge_items_weakness_id")
+    await external_items.create_index([("source_name", 1), ("created_at", DESCENDING)], name="idx_external_knowledge_items_source_created_at_desc")
+
+    external_chunks = database[EXTERNAL_KNOWLEDGE_CHUNKS_COLLECTION]
+    await external_chunks.create_index([("chunk_id", 1)], name="ux_external_knowledge_chunks_chunk_id", unique=True)
+    await external_chunks.create_index(
+        [("parent_item_id", 1), ("sequence", 1)],
+        name="ux_external_knowledge_chunks_parent_sequence",
+        unique=True,
+    )
+
+    benchmark_suites = database[BENCHMARK_SUITES_COLLECTION]
+    await benchmark_suites.create_index([("suite_id", 1)], name="ux_benchmark_suites_suite_id", unique=True)
+    await benchmark_suites.create_index([("suite_name", 1)], name="ux_benchmark_suites_suite_name", unique=True)
+
+    benchmark_cases = database[BENCHMARK_CASES_COLLECTION]
+    await benchmark_cases.create_index([("case_id", 1)], name="ux_benchmark_cases_case_id", unique=True)
+    await benchmark_cases.create_index(
+        [("suite_name", 1), ("content_fingerprint", 1)],
+        name="ux_benchmark_cases_suite_fingerprint",
+        unique=True,
+    )
+    await benchmark_cases.create_index([("suite_name", 1), ("created_at", DESCENDING)], name="idx_benchmark_cases_suite_created_at_desc")
+    await benchmark_cases.create_index([("vulnerability_category", 1)], name="idx_benchmark_cases_vulnerability_category")
+    await benchmark_cases.create_index([("language", 1), ("framework", 1)], name="idx_benchmark_cases_lang_framework")
+
+    benchmark_runs = database[BENCHMARK_RUNS_COLLECTION]
+    await benchmark_runs.create_index([("run_id", 1)], name="ux_benchmark_runs_run_id", unique=True)
+    await benchmark_runs.create_index([("suite_name", 1), ("created_at", DESCENDING)], name="idx_benchmark_runs_suite_created_at_desc")
+    await benchmark_runs.create_index([("status", 1), ("created_at", DESCENDING)], name="idx_benchmark_runs_status_created_at_desc")
+
+    feedback_events = database[FEEDBACK_EVENTS_COLLECTION]
+    await feedback_events.create_index([("event_id", 1)], name="ux_feedback_events_event_id", unique=True)
+    await feedback_events.create_index([("session_id", 1), ("created_at", DESCENDING)], name="idx_feedback_events_session_created_at_desc")
+    await feedback_events.create_index([("status", 1), ("created_at", DESCENDING)], name="idx_feedback_events_status_created_at_desc")
+
+    normalization_failures = database[NORMALIZATION_FAILURES_COLLECTION]
+    await normalization_failures.create_index([("failure_id", 1)], name="ux_normalization_failures_failure_id", unique=True)
+    await normalization_failures.create_index([("run_id", 1), ("created_at", DESCENDING)], name="idx_normalization_failures_run_created_at_desc")
+    await normalization_failures.create_index([("source_name", 1), ("created_at", DESCENDING)], name="idx_normalization_failures_source_created_at_desc")
+
+    ingestion_audit = database[INGESTION_AUDIT_COLLECTION]
+    await ingestion_audit.create_index([("audit_id", 1)], name="ux_ingestion_audit_audit_id", unique=True)
+    await ingestion_audit.create_index([("run_id", 1), ("created_at", DESCENDING)], name="idx_ingestion_audit_run_created_at_desc")
+    await ingestion_audit.create_index([("source_name", 1), ("created_at", DESCENDING)], name="idx_ingestion_audit_source_created_at_desc")
 
 
 def ensure_artifacts_directory() -> Path:
