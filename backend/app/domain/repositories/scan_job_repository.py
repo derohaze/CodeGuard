@@ -19,3 +19,11 @@ class ScanJobRepository(ABC):
     @abstractmethod
     async def list_by_session(self, session_id: str, limit: int = 25) -> list[ScanJobEntity]:
         raise NotImplementedError
+
+    @abstractmethod
+    async def count_active(self) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def find_active_by_source(self, source_fingerprint: str) -> ScanJobEntity | None:
+        raise NotImplementedError

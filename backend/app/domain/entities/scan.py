@@ -68,6 +68,7 @@ class ScanSessionEntity:
     current_phase: str
     elapsed_seconds: int
     preview: str
+    source_fingerprint: str | None = None
     progress_logs: list[str] = field(default_factory=list)
     phase_progress: int = 0
     progress_counters: dict | None = None

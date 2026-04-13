@@ -28,7 +28,7 @@ def _should_start_embedded_worker() -> bool:
 
 def _should_enable_reload() -> bool:
     settings = get_settings()
-    return settings.app_env == "development" and not _should_start_embedded_worker()
+    return settings.app_env == "development" and settings.api_workers == 1 and not _should_start_embedded_worker()
 
 
 def _start_embedded_worker() -> BaseProcess | None:
@@ -59,6 +59,7 @@ if __name__ == "__main__":
             "app.main:app",
             host=settings.app_host,
             port=settings.app_port,
+            workers=settings.api_workers,
             reload=_should_enable_reload(),
         )
     finally:

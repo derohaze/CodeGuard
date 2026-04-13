@@ -10,7 +10,7 @@ from app.application.use_cases.scan_mapper import map_session_detail
 from app.application.use_cases.get_scan_job import GetScanJobUseCase
 from app.application.use_cases.get_session import GetSessionUseCase
 from app.application.use_cases.start_scan import StartScanUseCase
-from app.core.exceptions import InvalidSourcePathError
+from app.core.exceptions import InvalidSourcePathError, WorkflowConflictError
 from app.presentation.api.v1.routes.dependencies import (
     get_scan_job_dispatcher,
     get_scan_job_use_case,
@@ -32,7 +32,20 @@ async def start_scan(
         created_session, created_job = await start_scan_use_case.execute(payload)
     except InvalidSourcePathError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    await scan_job_dispatcher.enqueue_scan(created_session.id, created_job.id)
+    except WorkflowConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    try:
+        await scan_job_dispatcher.enqueue_scan(created_session.id, created_job.id)
+    except Exception as exc:
+        await start_scan_use_case.mark_dispatch_failed(
+            created_session,
+            created_job,
+            "CodeGuard could not queue the scan job. Check queue readiness and retry.",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The scan job could not be queued.",
+        ) from exc
     return map_session_detail(created_session)
 
 

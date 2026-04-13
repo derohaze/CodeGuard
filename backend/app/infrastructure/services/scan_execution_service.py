@@ -35,6 +35,8 @@ from app.infrastructure.services.scan_coverage import (
 )
 from app.infrastructure.services.scope_planning import build_scan_plan
 from app.infrastructure.services.score_calibration import calibrate_security_score
+from app.infrastructure.services.scan_identity import build_source_fingerprint
+from app.infrastructure.services.scan_lock_manager import ScanLockLease, ScanLockManager
 from app.infrastructure.services.runtime_safety_policy import sanitize_runtime_error
 from app.infrastructure.services.segmentation_planning import build_scan_work_units
 from app.infrastructure.services.risk_prioritization import prioritize_review_queue
@@ -57,6 +59,7 @@ def create_initial_session(source_path: str, target_type: str, preset: str, scan
         title=f"Scan {path.name}",
         repo=path.name,
         source_path=str(path),
+        source_fingerprint=build_source_fingerprint(str(path), target_type),
         target_type=target_type,
         preset=preset,
         scan_mode="fast" if scan_mode == "fast" else "deep",
@@ -83,11 +86,13 @@ class ScanExecutionService:
         ai_client: SecurityAnalysisAIClient,
         job_repository: ScanJobRepository | None = None,
         workflow_persistence: WorkflowPersistenceService | None = None,
+        scan_lock_manager: ScanLockManager | None = None,
     ) -> None:
         self.repository = repository
         self.ai_client = ai_client
         self.job_repository = job_repository
         self.workflow_persistence = workflow_persistence
+        self.scan_lock_manager = scan_lock_manager
 
     async def submit(self, session_id: str, job_id: str | None = None) -> None:
         asyncio.create_task(self.run(session_id, job_id=job_id))
@@ -99,6 +104,16 @@ class ScanExecutionService:
 
         logs = list(session.progress_logs)
         started_at = time.monotonic()
+        lock_lease: ScanLockLease | None = None
+        if job_id and self.job_repository is not None and self.scan_lock_manager is not None:
+            job = await self.job_repository.get_by_id(job_id)
+            if job is not None:
+                lock_lease = await self.scan_lock_manager.build_lease_from_job(
+                    session_id=session_id,
+                    source_fingerprint=job.source_fingerprint or session.source_fingerprint,
+                    owner=job.lock_owner,
+                )
+                await self.scan_lock_manager.refresh_submission_locks(lock_lease)
         try:
             getattr(self.ai_client, "reset_runtime_state", lambda: None)()
             source = Path(session.source_path)
@@ -133,6 +148,7 @@ class ScanExecutionService:
                 logs,
                 "Collecting repository files",
                 "Indexing the selected source and discovering the codebase shape.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="discovery",
                 status="scanning",
@@ -202,6 +218,7 @@ class ScanExecutionService:
                 logs,
                 "Mapping trust boundaries",
                 "Building the route map, auth boundaries, imports, sinks, and untrusted-input sources.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="mapping",
                 scan_mode=session.scan_mode,
@@ -266,6 +283,7 @@ class ScanExecutionService:
                 logs,
                 "Mapping trust boundaries",
                 "Building the route map, auth boundaries, imports, sinks, and untrusted-input sources.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="mapping",
                 scan_mode=session.scan_mode,
@@ -286,6 +304,7 @@ class ScanExecutionService:
                 logs,
                 "Prioritizing attack surfaces",
                 "Selecting the highest-risk paths for deeper security review.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="segmentation",
                 scan_mode=session.scan_mode,
@@ -336,6 +355,7 @@ class ScanExecutionService:
                 logs,
                 "Tracing source-to-sink paths",
                 "Preparing prioritized path units and code blocks for deep review.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="path_tracing",
                 scan_mode=session.scan_mode,
@@ -392,6 +412,7 @@ class ScanExecutionService:
                     logs,
                     "Reviewing prioritized paths",
                     f"Tracing exploitability across: {batch_files or 'current review batch'}.",
+                    lock_lease=lock_lease,
                     job_id=job_id,
                     job_stage="reviewing_paths",
                     scan_mode=session.scan_mode,
@@ -457,6 +478,7 @@ class ScanExecutionService:
                         logs,
                         "Reviewing prioritized paths",
                         f"Reviewed batch {completed_batches}/{total_batches} and queued the next exploit path set.",
+                        lock_lease=lock_lease,
                         job_id=job_id,
                         job_stage="reviewing_paths",
                         scan_mode=session.scan_mode,
@@ -507,6 +529,7 @@ class ScanExecutionService:
                 logs,
                 "Validating concrete findings",
                 "Rejecting speculative issues and keeping only defensible exploit paths.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="validation",
                 scan_mode=session.scan_mode,
@@ -616,6 +639,7 @@ class ScanExecutionService:
                 logs,
                 "Validating concrete findings",
                 "Rejecting speculative issues and keeping only defensible exploit paths.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="validation",
                 scan_mode=session.scan_mode,
@@ -634,6 +658,7 @@ class ScanExecutionService:
                 logs,
                 "Building final verdict",
                 "Summarizing reviewed coverage, severity, and security posture.",
+                lock_lease=lock_lease,
                 job_id=job_id,
                 job_stage="scoring",
                 scan_mode=session.scan_mode,
@@ -891,6 +916,9 @@ class ScanExecutionService:
                         "error_message": friendly_error,
                     },
                 )
+        finally:
+            if self.scan_lock_manager is not None:
+                await self.scan_lock_manager.release_submission_locks(lock_lease)
 
     async def _update_with_logs(
         self,
@@ -898,6 +926,7 @@ class ScanExecutionService:
         logs: list[str],
         progress_message: str,
         preview: str,
+        lock_lease: ScanLockLease | None = None,
         status: str = "scanning",
         job_id: str | None = None,
         job_stage: str | None = None,
@@ -918,6 +947,8 @@ class ScanExecutionService:
         progress_counters = extra_updates.get("progress_counters")
         progress_state = build_progress_state(current_phase or progress_message, progress_counters)
         latest_scan_job = None
+        if self.scan_lock_manager is not None:
+            await self.scan_lock_manager.refresh_submission_locks(lock_lease)
         if job_id and self.job_repository is not None:
             latest_scan_job = await self._update_job(
                 session_id,

@@ -54,6 +54,10 @@ async def ensure_mongo_indexes() -> None:
     await scan_jobs.create_index([("job_id", 1)], name="ux_scan_jobs_job_id", unique=True)
     await scan_jobs.create_index([("session_id", 1), ("created_at", DESCENDING)], name="idx_scan_jobs_session_created_at_desc")
     await scan_jobs.create_index([("status", 1), ("created_at", DESCENDING)], name="idx_scan_jobs_status_created_at_desc")
+    await scan_jobs.create_index(
+        [("source_fingerprint", 1), ("status", 1), ("created_at", DESCENDING)],
+        name="idx_scan_jobs_source_status_created_at_desc",
+    )
 
     findings = database[FINDINGS_COLLECTION]
     await findings.update_many(

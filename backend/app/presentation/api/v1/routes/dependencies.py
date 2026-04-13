@@ -36,6 +36,7 @@ from app.infrastructure.repositories.mongo_scan_job_repository import MongoScanJ
 from app.infrastructure.repositories.mongo_scan_repository import MongoScanSessionRepository
 from app.infrastructure.repositories.mongo_verification_run_repository import MongoVerificationRunRepository
 from app.infrastructure.services.runtime_safety_policy import validate_provider_endpoints
+from app.infrastructure.services.scan_lock_manager import ScanLockManager
 from app.infrastructure.services.scan_execution_service import ScanExecutionService
 from app.infrastructure.services.workflow_persistence import WorkflowPersistenceService
 
@@ -69,6 +70,11 @@ def get_workflow_persistence_service() -> WorkflowPersistenceService:
 
 
 @lru_cache
+def get_scan_lock_manager() -> ScanLockManager:
+    return ScanLockManager()
+
+
+@lru_cache
 def get_ai_client() -> SecurityAnalysisAIClient:
     validate_provider_endpoints()
     return build_ai_client()
@@ -81,6 +87,7 @@ def get_scan_execution_service() -> ScanExecutionService:
         get_ai_client(),
         get_scan_job_repository(),
         get_workflow_persistence_service(),
+        get_scan_lock_manager(),
     )
 
 
@@ -104,7 +111,12 @@ def get_remediation_router() -> RemediationRouter:
 
 
 def get_start_scan_use_case() -> StartScanUseCase:
-    return StartScanUseCase(get_repository(), get_scan_job_repository(), get_workflow_persistence_service())
+    return StartScanUseCase(
+        get_repository(),
+        get_scan_job_repository(),
+        get_workflow_persistence_service(),
+        get_scan_lock_manager(),
+    )
 
 
 def get_scan_job_use_case() -> GetScanJobUseCase:

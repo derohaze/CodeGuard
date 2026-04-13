@@ -15,19 +15,35 @@ from app.application.use_cases.start_scan import StartScanUseCase
 class FakeSessionRepository:
     def __init__(self) -> None:
         self.created = None
+        self.updated = []
 
     async def create(self, session):
         self.created = session
         return session
 
+    async def update(self, session_id, updates):
+        self.updated.append((session_id, updates))
+        return self.created
+
 
 class FakeJobRepository:
     def __init__(self) -> None:
         self.created = None
+        self.updated = []
 
     async def create(self, job):
         self.created = job
         return job
+
+    async def update(self, job_id, updates):
+        self.updated.append((job_id, updates))
+        return self.created
+
+    async def count_active(self):
+        return 0
+
+    async def find_active_by_source(self, source_fingerprint):
+        return None
 
 
 class StartScanJobTests(unittest.TestCase):
@@ -51,10 +67,12 @@ class StartScanJobTests(unittest.TestCase):
             )
 
         self.assertEqual(session.id, job.session_id)
+        self.assertEqual(session.source_fingerprint, job.source_fingerprint)
         self.assertEqual(job.status, "queued")
         self.assertIsNotNone(session.latest_scan_job)
         self.assertEqual(session.latest_scan_job["id"], job.id)
         self.assertEqual(session.latest_scan_job["status"], "queued")
+        self.assertEqual(job.queue_name, "codeguard:queue:scan")
 
 
 if __name__ == "__main__":

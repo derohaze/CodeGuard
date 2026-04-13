@@ -52,6 +52,7 @@ class MongoManagerTests(unittest.TestCase):
         self.assertIn("ux_scan_jobs_job_id", scan_job_index_names)
         self.assertIn("idx_scan_jobs_session_created_at_desc", scan_job_index_names)
         self.assertIn("idx_scan_jobs_status_created_at_desc", scan_job_index_names)
+        self.assertIn("idx_scan_jobs_source_status_created_at_desc", scan_job_index_names)
         finding_index_names = [call.kwargs.get("name") for call in findings.create_index.call_args_list]
         self.assertIn("ux_findings_session_kind_finding_id", finding_index_names)
 

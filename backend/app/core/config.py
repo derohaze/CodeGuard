@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     app_host: str = Field(default="127.0.0.1", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
+    api_workers: int = Field(default=1, alias="API_WORKERS")
     app_cors_origins: list[str] | str = Field(default="http://localhost:8080", alias="APP_CORS_ORIGINS")
     ai_provider_order: list[str] | str = Field(default="nvidia", alias="AI_PROVIDER_ORDER")
 
@@ -33,10 +34,18 @@ class Settings(BaseSettings):
     mongodb_server_selection_timeout_ms: int = Field(default=3000, alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
     queue_backend: str = Field(default="in_process", alias="QUEUE_BACKEND")
     auto_start_queue_worker: bool = Field(default=True, alias="AUTO_START_QUEUE_WORKER")
+    scan_lock_backend: str = Field(default="auto", alias="SCAN_LOCK_BACKEND")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     scan_queue_name: str = Field(default="codeguard:queue:scan", alias="SCAN_QUEUE_NAME")
+    ai_queue_name: str = Field(default="codeguard:queue:ai", alias="AI_QUEUE_NAME")
+    verify_queue_name: str = Field(default="codeguard:queue:verify", alias="VERIFY_QUEUE_NAME")
+    report_queue_name: str = Field(default="codeguard:queue:report", alias="REPORT_QUEUE_NAME")
     scan_job_timeout_seconds: int = Field(default=1800, alias="SCAN_JOB_TIMEOUT_SECONDS")
     worker_concurrency: int = Field(default=4, alias="WORKER_CONCURRENCY")
+    worker_max_jobs: int = Field(default=4, alias="WORKER_MAX_JOBS")
+    global_concurrent_scans_limit: int = Field(default=4, alias="GLOBAL_CONCURRENT_SCANS_LIMIT")
+    session_scan_lock_ttl_seconds: int = Field(default=1800, alias="SESSION_SCAN_LOCK_TTL_SECONDS")
+    source_scan_lock_ttl_seconds: int = Field(default=1800, alias="SOURCE_SCAN_LOCK_TTL_SECONDS")
     artifacts_dir: str = Field(
         default=str(Path(__file__).resolve().parents[2] / "artifacts"),
         alias="ARTIFACTS_DIR",
@@ -62,6 +71,14 @@ class Settings(BaseSettings):
         normalized = str(value).strip().lower()
         if normalized not in {"in_process", "arq"}:
             raise ValueError("QUEUE_BACKEND must be either 'in_process' or 'arq'.")
+        return normalized
+
+    @field_validator("scan_lock_backend", mode="before")
+    @classmethod
+    def normalize_scan_lock_backend(cls, value: str):
+        normalized = str(value).strip().lower()
+        if normalized not in {"auto", "in_memory", "redis"}:
+            raise ValueError("SCAN_LOCK_BACKEND must be 'auto', 'in_memory', or 'redis'.")
         return normalized
 
 
