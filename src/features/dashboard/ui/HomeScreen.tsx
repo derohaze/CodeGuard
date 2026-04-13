@@ -262,13 +262,13 @@ export function HomeScreen({ onStartScan }: HomeScreenProps) {
                   <PlanRow label="Source" value={selectedTargetName} />
                 </div>
                 <div
-                  className="mt-4 rounded-[18px] border bg-card px-4 py-3"
+                  className="mt-4 h-[156px] overflow-hidden rounded-[18px] border bg-card px-4 py-3"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">
                     What happens next
                   </p>
-                  <p className="mt-2 text-[13px] leading-6 text-txt-secondary">{scanSummary}</p>
+                  <p className="mt-2 h-[96px] overflow-hidden text-[13px] leading-6 text-txt-secondary">{scanSummary}</p>
                 </div>
                 <p className="mt-4 min-h-[48px] text-[13px] leading-6 text-txt-secondary">
                   {selectedPreset.description}
