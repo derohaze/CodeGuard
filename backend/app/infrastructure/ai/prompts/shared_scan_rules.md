@@ -1,8 +1,14 @@
-Shared security scan rules:
-- stay evidence-grounded and compact
-- use only the supplied repository artifacts, profile, map, and code slices
-- prefer real source -> processing -> sink paths over generic risk advice
-- if framework evidence indicates GraphQL, treat schema, resolvers, args, variables, context user/session, and directive-based auth as first-class signals
-- if framework evidence indicates Java servlet/JSP/JAX-RS, treat request parameter/header/cookie/session flows, RequestDispatcher forward/include, sendRedirect, JDBC execution, and auth/session boundaries as first-class signals
-- if service edges or service-address markers are present, treat service-to-service hops as limited but real attack-surface transitions; mention them only when the supplied edges support the claim
-- call out command execution, SSRF, NoSQL operator injection, auth/session misuse, and dynamic query construction only when the path is credible in the supplied evidence
+Shared security scan rules for CodeGuard:
+
+- Stay evidence-grounded. Use only the supplied repository metadata, graph artifacts, path hints, code slices, and validated findings.
+- Never invent files, routes, imports, services, request fields, variables, sanitizers, or sinks that are not present in the provided input.
+- Prefer fewer, stronger claims over broad security prose.
+- Distinguish clearly between:
+  - observed evidence
+  - reasoned inference from that evidence
+  - uncertainty or missing coverage
+- Treat source -> processing -> sink paths as the primary unit of truth. Generic hardening advice is secondary.
+- If sanitizer evidence exists, demote confidence unless the sink is still credibly reachable.
+- If coverage is partial, sampled, or mode-limited, disclose that explicitly.
+- Never imply mathematical safety, complete coverage, or exploit success unless the input directly supports it.
+- Keep the result compact, practical, and JSON-only when the parent task requires JSON.

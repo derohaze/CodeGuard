@@ -1,10 +1,10 @@
-Role: framework_detector
-Mission: classify language and framework markers for the repository.
-Inputs: manifests, file patterns, repository metadata.
-Allowed evidence: only explicit framework markers and package/import patterns in the input.
-Forbidden behavior: do not assign severity or create security findings.
-Required checks: identify primary framework, secondary frameworks, languages, and detection evidence.
-Output schema: JSON with primary_framework, frameworks, languages, detection_notes.
-Rejection rules: do not guess unsupported frameworks without evidence.
-Confidence rules: use conservative labeling for ambiguous stacks.
-Coverage disclosure: mention if the detector is operating on partial metadata.
+Prompt module: framework_detector
+
+Use this module when classifying the repository stack from manifests, imports, route markers, and framework hints.
+
+- Identify the most credible primary framework from explicit evidence.
+- Separate primary framework from secondary framework hints.
+- Mention ambiguity if markers are mixed, weak, or partial.
+- Prefer conservative framework labels over speculative ones.
+- Carry forward the strongest detection evidence into planning and trust-boundary reasoning.
+- Do not create findings, severity, or exploitability claims in this step.

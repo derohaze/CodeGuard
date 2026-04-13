@@ -2,10 +2,51 @@ from pathlib import Path
 
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+ACTIVE_RUNTIME_PROMPTS = frozenset(
+    {
+        "repository_mapper.md",
+        "path_reviewer.md",
+        "finding_validator.md",
+        "verdict_analyst.md",
+        "explain_prompt.md",
+        "fix_prompt.md",
+        "fix_validator_prompt.md",
+    }
+)
 PROMPT_PACKS = {
-    "repository_mapper.md": ("shared_scan_rules.md", "shared_framework_focus.md", "repository_mapper.md"),
-    "path_reviewer.md": ("shared_scan_rules.md", "shared_framework_focus.md", "path_reviewer.md"),
+    "repository_mapper.md": (
+        "shared_scan_rules.md",
+        "shared_framework_focus.md",
+        "framework_detector.md",
+        "scope_planner.md",
+        "graph_builder.md",
+        "source_sink_locator.md",
+        "risk_prioritizer.md",
+        "segment_planner.md",
+        "repository_mapper.md",
+    ),
+    "path_reviewer.md": (
+        "shared_scan_rules.md",
+        "shared_framework_focus.md",
+        "source_sink_locator.md",
+        "risk_prioritizer.md",
+        "path_reviewer.md",
+    ),
     "framework_detector.md": ("shared_framework_focus.md", "framework_detector.md"),
+    "finding_validator.md": (
+        "shared_scan_rules.md",
+        "shared_framework_focus.md",
+        "source_sink_locator.md",
+        "annotation_builder.md",
+        "finding_validator.md",
+    ),
+    "verdict_analyst.md": (
+        "shared_scan_rules.md",
+        "score_analyst.md",
+        "annotation_builder.md",
+        "report_writer.md",
+        "verdict_analyst.md",
+    ),
     "explain_prompt.md": ("shared_remediation_rules.md", "explain_prompt.md"),
     "fix_prompt.md": ("shared_remediation_rules.md", "fix_prompt.md"),
     "fix_validator_prompt.md": ("shared_remediation_rules.md", "fix_validator_prompt.md"),

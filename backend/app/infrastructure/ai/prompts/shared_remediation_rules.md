@@ -1,13 +1,31 @@
-Shared remediation policy:
-- prefer complete sink-level fixes over router-only or input-screening mitigations
-- command injection:
-  - prefer structured execution (`subprocess.run([...], shell=False)`, argv/args arrays, execFile/spawn without shell) over input filtering
+Shared remediation policy for CodeGuard:
+
+- Prefer complete sink-level or service-layer fixes over router-only filtering.
+- Distinguish clearly between:
+  - full fix
+  - partial mitigation
+  - temporary guard
+  - risky workaround
+- Do not claim a full fix if the sink pattern still fundamentally remains reachable.
+- Preserve project style and local code shape. Avoid unrelated refactors.
+- If a safer fix belongs deeper in the service, DAO, query, execution, or session layer, say that explicitly.
+
+Category guidance:
+
+- Command injection:
+  - prefer structured execution (`argv` arrays, `shell=False`, `execFile`, `spawn` without shell) over filtering
 - SSRF:
-  - prefer URL parsing, scheme/host validation, allowlisted destinations, private/link-local/metadata blocking, and outbound/client-layer enforcement over regex checks
-- auth/session:
+  - prefer URL parsing, scheme/host validation, allowlists, private/link-local/metadata blocking, and client-layer enforcement over regex-only checks
+- SQL / NoSQL injection:
+  - prefer parameterization, typed filters, safe query builders, and operator allowlists over sanitization-only approaches
+- Auth / session:
   - prefer fixes in authentication/session/security logic over route-only guards
-  - session repairs should consider regeneration, invalidation, rotation, and server-side verification
-- NoSQL injection:
-  - prefer typed filter documents, operator allowlists, and safe query builders over sanitization-only approaches
+  - consider regeneration, invalidation, rotation, and server-side verification where relevant
+- Path traversal / filesystem:
+  - prefer canonicalization plus safe-root enforcement over filename filtering
 - GraphQL:
-  - respect resolver/context evidence, auth directives or middleware, and excessive data exposure boundaries when they are present in the context
+  - respect resolver/context evidence, auth directives or middleware, and data-exposure boundaries when they are present
+
+Output discipline:
+
+- If the product expects structured fields such as fix type, security strength, regression risk, residual risks, or policy notes, populate them directly instead of forcing defaults downstream.

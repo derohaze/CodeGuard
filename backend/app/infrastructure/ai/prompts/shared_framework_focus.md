@@ -1,11 +1,19 @@
-Framework-specific focus:
+Framework-specific focus modules:
+
 - GraphQL:
-  - trace schema/query/mutation/resolver/context relationships when present
-  - treat args, variables, and resolver input objects as untrusted sources
-  - pay attention to auth directives, middleware, depth/cost guards, raw SQL/raw query APIs, file import paths, and command helpers
-- Java servlet / non-Spring Java:
-  - treat HttpServletRequest, HttpSession, doGet/doPost, @WebServlet, JSP includes/forwards, and JDBC Statement execution as high-signal markers
-  - distinguish router/view-layer guards from fixes that move into service, DAO, repository, or auth/session logic
-- Multi-service:
-  - use service address edges, grpc/http clients, and service graph links conservatively
-  - identify useful boundary transitions, not distributed perfection
+  - treat schema, query, mutation, resolver, args, variables, input objects, and context/session objects as first-class sources
+  - watch auth directives, middleware, resolver-layer policy checks, raw SQL/raw query APIs, file import paths, and command helpers
+  - distinguish schema exposure issues from execution-path issues
+- FastAPI / Python web services:
+  - treat request bodies, query/path params, headers, cookies, dependency-injected auth/session context, and file helpers as high-signal inputs
+  - prefer sink-level fixes over route-only checks when the vulnerable operation is deeper in the service layer
+- Java servlet / JAX-RS / JSP:
+  - treat request parameter/header/cookie/session access, RequestDispatcher forward/include, sendRedirect, JDBC execution, and session/auth transitions as high-signal markers
+  - distinguish controller/view wiring from service, DAO, repository, and auth/session enforcement
+- Multi-service / gRPC / outbound calls:
+  - use service edges, grpc/http clients, and service-address markers conservatively
+  - identify supported trust-boundary hops, not speculative distributed chains
+- When the framework is ambiguous:
+  - remain conservative
+  - disclose ambiguity
+  - avoid over-specialized claims
