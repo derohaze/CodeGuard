@@ -14,6 +14,10 @@ describe("home-screen.utils", () => {
     expect(inferWorkspace("D:\\workspace\\secure-scan\\src\\main.tsx", "file")).toBe("src");
   });
 
+  it("returns short workspace placeholder when no source is selected", () => {
+    expect(inferWorkspace("", "folder")).toBe("Select source");
+  });
+
   it("deduplicates remembered recent sources", () => {
     const now = new Date("2026-04-08T10:00:00Z").getTime();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);

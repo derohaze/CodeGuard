@@ -56,9 +56,9 @@ export function HomeScreen({ onStartScan }: HomeScreenProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: 0.1 }}
-      className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-8 pt-10 pb-4"
+      className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-5 pb-4 pt-8 sm:px-6 lg:px-8"
     >
-      <div className="mx-auto flex min-h-full w-full max-w-[1000px] flex-1 flex-col gap-5">
+      <div className="flex min-h-full w-full flex-1 flex-col gap-5">
         <div className="max-w-[760px]">
           <div className="flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">
             <ScanSearch size={15} className="text-txt-secondary" />
@@ -86,10 +86,10 @@ export function HomeScreen({ onStartScan }: HomeScreenProps) {
                   description="This is inferred automatically from the source path you choose."
                 >
                   <div
-                    className="flex min-h-11 items-center rounded-[14px] border bg-[#f7f2ea] px-4 text-sm font-medium text-txt-primary"
+                    className="flex min-h-11 min-w-0 items-center rounded-[14px] border bg-[#f7f2ea] px-4 text-sm font-medium text-txt-primary"
                     style={{ borderColor: "hsl(var(--border-soft))" }}
                   >
-                    {inferredWorkspace}
+                    <span className="truncate whitespace-nowrap">{inferredWorkspace}</span>
                   </div>
                 </SetupField>
 

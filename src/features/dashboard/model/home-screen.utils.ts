@@ -17,7 +17,7 @@ export function basename(path: string) {
 }
 
 export function inferWorkspace(path: string, type: SourceTargetType) {
-  if (!path) return "Choose a source first";
+  if (!path) return "Select source";
 
   const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
   const parts = normalized.split("/");
