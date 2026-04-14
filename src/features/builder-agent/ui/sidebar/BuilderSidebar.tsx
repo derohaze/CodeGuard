@@ -11,6 +11,16 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -69,6 +79,10 @@ interface BuilderSidebarProps {
   workspaceMode: WorkspaceMode;
 }
 
+type PendingDeleteTarget =
+  | { type: "thread"; id: string; label: string }
+  | { type: "workspace"; id: string; label: string };
+
 export function BuilderSidebar({
   activeConversationId,
   busyConversationIds,
@@ -108,6 +122,7 @@ export function BuilderSidebar({
   const [organizeMode, setOrganizeMode] = useState<"workspace" | "time" | null>(null);
   const [sortBy, setSortBy] = useState<"created" | "updated" | null>(null);
   const [showMode, setShowMode] = useState<"all" | "relevant" | null>(null);
+  const [pendingDeleteTarget, setPendingDeleteTarget] = useState<PendingDeleteTarget | null>(null);
 
   const activeFilterCount = Number(organizeMode !== null) + Number(sortBy !== null) + Number(showMode !== null);
   const allCollapsed = expandedWorkspaceIds.length === 0;
@@ -170,6 +185,20 @@ export function BuilderSidebar({
   const orderedThreadGroups = orderedWorkspaceIds
     .map((workspaceId) => filteredThreadGroups.find((group) => group.id === workspaceId) ?? null)
     .filter((group): group is BuilderThreadGroup => group !== null);
+
+  const handleConfirmDelete = () => {
+    if (!pendingDeleteTarget) {
+      return;
+    }
+
+    if (pendingDeleteTarget.type === "thread") {
+      onRemoveThread(pendingDeleteTarget.id);
+    } else {
+      onRemoveWorkspace(pendingDeleteTarget.id);
+    }
+
+    setPendingDeleteTarget(null);
+  };
 
   return (
     <div
@@ -364,7 +393,12 @@ export function BuilderSidebar({
                           <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onRenameWorkspace(group.id)}>Edit name</DropdownMenuItem>
                           <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onArchiveWorkspaceThreads(group.id)}>Archive chats</DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-border-soft" />
-                          <DropdownMenuItem className="rounded-xl text-sm text-[#9f5c53] focus:bg-[#faece8] focus:text-[#9f5c53]" onClick={() => onRemoveWorkspace(group.id)}>Remove project</DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="rounded-xl text-sm text-[#9f5c53] focus:bg-[#faece8] focus:text-[#9f5c53]"
+                            onClick={() => setPendingDeleteTarget({ type: "workspace", id: group.id, label: group.label })}
+                          >
+                            Delete project
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Tooltip delayDuration={0}>
@@ -418,7 +452,12 @@ export function BuilderSidebar({
                                         <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onRenameThread(thread.id)}>Edit name</DropdownMenuItem>
                                         <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onArchiveThread(thread.id)}>Archive chat</DropdownMenuItem>
                                         <DropdownMenuSeparator className="bg-border-soft" />
-                                        <DropdownMenuItem className="rounded-xl text-sm text-[#9f5c53] focus:bg-[#faece8] focus:text-[#9f5c53]" onClick={() => onRemoveThread(thread.id)}>Remove</DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          className="rounded-xl text-sm text-[#9f5c53] focus:bg-[#faece8] focus:text-[#9f5c53]"
+                                          onClick={() => setPendingDeleteTarget({ type: "thread", id: thread.id, label: thread.title })}
+                                        >
+                                          Delete
+                                        </DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </div>
@@ -463,6 +502,40 @@ export function BuilderSidebar({
           onToggleCollapse={onToggleCollapse}
           threadGroups={threadGroups}
         />
+        <AlertDialog open={pendingDeleteTarget !== null} onOpenChange={(open) => {
+          if (!open) {
+            setPendingDeleteTarget(null);
+          }
+        }}>
+          <AlertDialogContent className="max-w-[420px] rounded-[28px] border border-border-soft bg-surface p-0 shadow-[0_28px_80px_rgba(52,42,28,0.14)]">
+            <div className="space-y-5 p-6">
+              <AlertDialogHeader className="space-y-2 text-left">
+                <AlertDialogTitle className="font-brand text-[26px] font-medium tracking-[-0.02em] text-txt-primary">
+                  {pendingDeleteTarget?.type === "workspace" ? "Delete this project?" : "Delete this chat?"}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-txt-secondary">
+                  {pendingDeleteTarget?.type === "workspace"
+                    ? `This will permanently remove "${pendingDeleteTarget.label}" and its chats from the builder sidebar.`
+                    : `This will permanently remove "${pendingDeleteTarget?.label ?? "this chat"}" from the builder sidebar.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2 sm:justify-start sm:space-x-0">
+                <AlertDialogCancel className="mt-0 rounded-full border border-[#ddd1bf] bg-[#f6efe6] px-5 !text-[#1e1b16] hover:bg-[#eee3d5]">
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
+                    handleConfirmDelete();
+                  }}
+                  className="rounded-full bg-[#1e1b16] px-5 text-white hover:bg-[#29241d]"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </motion.aside>
     </div>
   );

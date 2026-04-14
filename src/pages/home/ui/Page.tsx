@@ -1362,7 +1362,7 @@ export default function Page() {
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2 sm:justify-start sm:space-x-0">
               <AlertDialogCancel
-                className="mt-0 rounded-full border border-border-soft bg-transparent px-5 text-txt-primary hover:bg-secondary"
+                className="mt-0 rounded-full border border-[#ddd1bf] bg-[#f6efe6] px-5 !text-[#1e1b16] hover:bg-[#eee3d5]"
                 disabled={isDeleting}
               >
                 Cancel

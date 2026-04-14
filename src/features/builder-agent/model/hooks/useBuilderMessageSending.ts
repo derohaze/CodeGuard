@@ -131,9 +131,9 @@ export function useBuilderMessageSending({
     };
   }, []);
 
-  const sendMessage = useCallback(() => {
+  const sendMessage = useCallback((promptOverride?: string) => {
     void (async () => {
-      const prompt = draft.trim();
+      const prompt = (promptOverride ?? draft).trim();
       if (!prompt || !currentWorkspace) return;
 
       const requestThreadId = activeConversationId;

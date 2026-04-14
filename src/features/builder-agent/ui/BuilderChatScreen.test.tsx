@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -122,5 +122,60 @@ describe("BuilderChatScreen", () => {
     const button = screen.getByLabelText("Stop response");
     expect(button.querySelector("svg")).not.toBeNull();
     expect(screen.getByLabelText("Preparing response")).toBeInTheDocument();
+  });
+
+  it("sends the clicked prompt suggestion directly from the new chat cards", () => {
+    const onSend = vi.fn();
+
+    render(
+      <TooltipProvider>
+        <BuilderChatScreen
+          activeConversationId={null}
+          composerSettings={{
+            permissionMode: "default",
+            planMode: false,
+            responseSpeed: "normal",
+            attachedFiles: [],
+          }}
+          contextUsage={{
+            maxTokens: 24000,
+            percentage: 0,
+            usedTokens: 0,
+          }}
+          currentWorkspaceId={null}
+          currentWorkspacePath={null}
+          conversationTitle="New chat"
+          conversationSubtitle="workspace"
+          draft=""
+          isNewChat
+          prepareProgress={0}
+          isPreparingResponse={false}
+          isStreaming={false}
+          messages={[]}
+          promptSuggestions={[
+            {
+              id: "snake-game",
+              title: "Build a classic Snake game in this repo",
+              description: "Scaffold the UI, gameplay loop, and keyboard controls in one pass.",
+            },
+          ]}
+          onArchiveConversation={vi.fn()}
+          onOpenWorkspaceInExplorer={vi.fn()}
+          onPermissionModeChange={vi.fn()}
+          onPickAttachment={vi.fn()}
+          onPlanModeChange={vi.fn()}
+          onRenameConversation={vi.fn()}
+          onDraftChange={vi.fn()}
+          onRemoveAttachment={vi.fn()}
+          onSend={onSend}
+          onStopStreaming={vi.fn()}
+          onCreatePermanentWorktree={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /build a classic snake game in this repo/i }));
+
+    expect(onSend).toHaveBeenCalledWith("Build a classic Snake game in this repo");
   });
 });

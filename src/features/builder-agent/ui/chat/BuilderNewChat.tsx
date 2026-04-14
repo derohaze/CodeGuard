@@ -1,12 +1,13 @@
-import { Sparkles } from "lucide-react";
 import type { BuilderPromptSuggestion } from "../../model/mockBuilderAgent";
 
 export function BuilderNewChat({
   promptSuggestions,
   workspaceLabel,
+  onSelectSuggestion,
 }: {
   promptSuggestions: BuilderPromptSuggestion[];
   workspaceLabel: string;
+  onSelectSuggestion: (prompt: string) => void;
 }) {
   return (
     <div className="flex flex-1 items-center justify-center dotted-bg px-8 py-10">
@@ -19,13 +20,11 @@ export function BuilderNewChat({
             <button
               key={suggestion.id}
               type="button"
+              onClick={() => onSelectSuggestion(suggestion.title)}
               className="rounded-[24px] border bg-[#f5efe3] px-5 py-5 text-left shadow-[0_10px_24px_rgba(52,42,28,0.05)] transition-colors hover:bg-[#efe6d4]"
               style={{ borderColor: "hsl(var(--border-soft))" }}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-card text-[#8a775b]">
-                <Sparkles size={16} />
-              </div>
-              <p className="mt-4 text-[18px] font-medium leading-7 text-txt-primary">{suggestion.title}</p>
+              <p className="text-[18px] font-medium leading-7 text-txt-primary">{suggestion.title}</p>
               <p className="mt-2 text-sm leading-6 text-txt-secondary">{suggestion.description}</p>
             </button>
           ))}

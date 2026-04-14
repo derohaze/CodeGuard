@@ -49,6 +49,20 @@ export function BuilderChatScreen({
     });
   }, [onSend]);
 
+  const handleSuggestionSelect = useCallback((prompt: string) => {
+    scrollToLatestRef.current?.();
+    onSend(prompt);
+    if (pendingScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingScrollFrameRef.current);
+    }
+    pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
+      pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
+        scrollToLatestRef.current?.();
+        pendingScrollFrameRef.current = null;
+      });
+    });
+  }, [onSend]);
+
   useEffect(() => () => {
     if (pendingScrollFrameRef.current !== null) {
       window.cancelAnimationFrame(pendingScrollFrameRef.current);
@@ -64,7 +78,11 @@ export function BuilderChatScreen({
       className="flex min-h-0 flex-1 flex-col bg-surface"
     >
       {isNewChat ? (
-        <BuilderNewChat promptSuggestions={promptSuggestions} workspaceLabel={conversationSubtitle} />
+        <BuilderNewChat
+          promptSuggestions={promptSuggestions}
+          workspaceLabel={conversationSubtitle}
+          onSelectSuggestion={handleSuggestionSelect}
+        />
       ) : (
         <BuilderConversationView
           activeConversationId={activeConversationId}

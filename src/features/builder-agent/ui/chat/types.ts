@@ -25,7 +25,7 @@ export interface BuilderChatScreenProps {
   onRenameConversation: (conversationId: string) => void;
   onDraftChange: (value: string) => void;
   onRemoveAttachment: (path: string) => void;
-  onSend: () => void;
+  onSend: (promptOverride?: string) => void;
   onStopStreaming: () => void;
   onCreatePermanentWorktree: (workspaceId: string) => void;
 }
