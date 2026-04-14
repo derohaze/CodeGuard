@@ -35,7 +35,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ShinyText } from "@/components/ui/shiny-text";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -113,6 +112,10 @@ export function BuilderChatScreen({
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
+    if (isStreaming) {
+      onStopStreaming();
+      return;
+    }
     if (!draft.trim()) return;
     onSend();
   };
@@ -272,12 +275,6 @@ export function BuilderChatScreen({
                     </div>
                   </PopoverContent>
                 </Popover>
-                <button className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors hover:bg-muted">
-                  GPT-5.4 <ChevronDown size={14} />
-                </button>
-                <button className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors hover:bg-muted">
-                  Medium <ChevronDown size={14} />
-                </button>
                 {composerSettings.planMode && (
                   <div className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#edf4ff] px-2.5 text-[13px] font-medium text-[#3f6fb2]">
                     <ListTodo size={13} />
@@ -442,6 +439,19 @@ function basename(filePath: string) {
   return parts[parts.length - 1] ?? filePath;
 }
 
+function BuilderMessageText({ text, isStreaming }: { text: string; isStreaming: boolean }) {
+  return (
+    <p
+      dir="auto"
+      className="whitespace-pre-wrap break-words text-start"
+      style={{ unicodeBidi: "plaintext" }}
+    >
+      {text}
+      {isStreaming && <span className="ml-0.5 inline-block h-5 w-[2px] animate-pulse align-[-2px] bg-current opacity-45" />}
+    </p>
+  );
+}
+
 function ContextUsageRing({ value }: { value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   const radius = 5;
@@ -499,31 +509,97 @@ function BuilderConversationView({
   onRenameConversation: (conversationId: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const stickToBottomRef = useRef(true);
+  const followOutputRef = useRef(true);
+  const scrollFrameRef = useRef<number | null>(null);
+  const scrollTargetRef = useRef<number>(0);
+  const lastScrollTopRef = useRef(0);
+  const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
 
-    const updateStickiness = () => {
+    lastScrollTopRef.current = container.scrollTop;
+
+    const updateFollowMode = () => {
+      const currentTop = container.scrollTop;
+      const wasProgrammatic = programmaticScrollRef.current;
+      programmaticScrollRef.current = false;
+
       const distanceFromBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight;
-      stickToBottomRef.current = distanceFromBottom <= 48;
+        container.scrollHeight - currentTop - container.clientHeight;
+      const isNearBottom = distanceFromBottom <= 48;
+
+      if (isNearBottom) {
+        followOutputRef.current = true;
+      } else if (!wasProgrammatic || currentTop < lastScrollTopRef.current) {
+        followOutputRef.current = false;
+        if (currentTop < lastScrollTopRef.current && scrollFrameRef.current !== null) {
+          window.cancelAnimationFrame(scrollFrameRef.current);
+          scrollFrameRef.current = null;
+        }
+      }
+
+      lastScrollTopRef.current = currentTop;
     };
 
-    updateStickiness();
-    container.addEventListener("scroll", updateStickiness);
+    updateFollowMode();
+    container.addEventListener("scroll", updateFollowMode);
 
     return () => {
-      container.removeEventListener("scroll", updateStickiness);
+      container.removeEventListener("scroll", updateFollowMode);
     };
   }, []);
 
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container || !stickToBottomRef.current) return;
-    container.scrollTop = container.scrollHeight;
+    if (!container || !followOutputRef.current) return;
+
+    scrollTargetRef.current = Math.max(0, container.scrollHeight - container.clientHeight);
+    if (scrollFrameRef.current !== null) {
+      return;
+    }
+
+    const step = () => {
+      const activeContainer = scrollRef.current;
+      if (!activeContainer) {
+        scrollFrameRef.current = null;
+        return;
+      }
+
+      if (!followOutputRef.current) {
+        scrollFrameRef.current = null;
+        return;
+      }
+
+      const target = scrollTargetRef.current;
+      const current = activeContainer.scrollTop;
+      const distance = target - current;
+
+      if (Math.abs(distance) <= 1) {
+        activeContainer.scrollTop = target;
+        followOutputRef.current = true;
+        lastScrollTopRef.current = target;
+        scrollFrameRef.current = null;
+        return;
+      }
+
+      const nextTop =
+        current + Math.sign(distance) * Math.max(1, Math.abs(distance) * 0.16);
+      programmaticScrollRef.current = true;
+      activeContainer.scrollTop = distance > 0 ? Math.min(target, nextTop) : Math.max(target, nextTop);
+      scrollFrameRef.current = window.requestAnimationFrame(step);
+    };
+
+    scrollFrameRef.current = window.requestAnimationFrame(step);
   }, [messages]);
+
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+    }
+    programmaticScrollRef.current = false;
+  }, []);
 
   return (
     <>
@@ -578,45 +654,33 @@ function BuilderConversationView({
         <div className="mx-auto flex w-full max-w-[980px] flex-col gap-4">
           {messages.map((message) =>
             message.role === "user" ? (
-              <motion.div
+              <div
                 key={message.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                 className="ml-auto max-w-[72%] rounded-[24px] border border-[#1e1b18] bg-[#1e1b18] px-5 py-4 text-[15px] leading-7 text-white shadow-card"
               >
-                <p className="whitespace-pre-wrap break-words">{message.text}</p>
-              </motion.div>
+                <BuilderMessageText text={message.text} isStreaming={false} />
+              </div>
             ) : (
-              <motion.div
+              <div
                 key={message.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                 className="max-w-[92%] px-2 py-1 text-[15px] leading-8 text-txt-primary"
               >
                 <div className="space-y-2">
-                  {message.reasoningLines && message.reasoningLines.length > 0 && (
-                    <div className="min-h-[132px] space-y-1.5">
-                      <div className="opacity-90">
-                        <ShinyText
-                          text={message.reasoningLines[0]}
-                          className="text-[15px] font-medium leading-8"
-                          color="#6d655c"
-                          shineColor="#fffdf8"
-                          speed={1.85}
-                        />
-                      </div>
-                      {message.reasoningLines.slice(1).map((line, index) => (
-                        <p key={`${message.id}-reasoning-body-${index}`} className="text-[14px] leading-7 text-[#746b5f]">
-                          {line}
-                        </p>
-                      ))}
+                  {message.isStreaming && !message.text && (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-[#f3ece0] px-3 py-1.5 text-[13px] text-[#6d655c]">
+                      <span className="flex gap-1">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:300ms]" />
+                      </span>
+                      <span>Thinking...</span>
                     </div>
                   )}
-                  {message.text && <p className="text-txt-primary">{message.text}</p>}
+                  {message.text && (
+                    <BuilderMessageText text={message.text} isStreaming={Boolean(message.isStreaming)} />
+                  )}
                 </div>
-              </motion.div>
+              </div>
             ),
           )}
         </div>

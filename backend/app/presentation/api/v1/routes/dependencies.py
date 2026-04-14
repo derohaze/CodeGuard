@@ -1,5 +1,8 @@
 from functools import lru_cache
 
+from app.builder_agent.provider import RoutingRunBuilderProvider
+from app.builder_agent.repository import BuilderAgentRepository
+from app.builder_agent.service import BuilderAgentService
 from app.application.use_cases.delete_all_sessions import DeleteAllSessionsUseCase
 from app.application.use_cases.delete_session import DeleteSessionUseCase
 from app.application.use_cases.apply_fix import ApplyFixUseCase
@@ -105,6 +108,24 @@ def get_runtime_settings_repository() -> RuntimeSettingsRepository:
 @lru_cache
 def get_runtime_settings_service() -> RuntimeSettingsService:
     return RuntimeSettingsService(get_runtime_settings_repository())
+
+
+@lru_cache
+def get_builder_agent_repository() -> BuilderAgentRepository:
+    return BuilderAgentRepository()
+
+
+@lru_cache
+def get_builder_provider() -> RoutingRunBuilderProvider:
+    return RoutingRunBuilderProvider()
+
+
+@lru_cache
+def get_builder_agent_service() -> BuilderAgentService:
+    return BuilderAgentService(
+        repository=get_builder_agent_repository(),
+        provider=get_builder_provider(),
+    )
 
 
 @lru_cache

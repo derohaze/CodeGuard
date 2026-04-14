@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.builder_agent.routes import router as builder_router
 from app.core.config import get_settings
 from app.core.error_handlers import register_error_handlers
 from app.core.logging import configure_logging
@@ -44,4 +45,5 @@ app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(remediation.router, prefix="/api/v1", tags=["remediation"])
 app.include_router(learning.router, prefix="/api/v1", tags=["learning"])
 app.include_router(settings_routes.router, prefix="/api/v1", tags=["settings"])
+app.include_router(builder_router, prefix="/api/v1", tags=["builder"])
 register_error_handlers(app)

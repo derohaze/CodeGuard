@@ -1,18 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  builderConversations,
-  builderMessages,
+  archiveBuilderThread,
+  archiveBuilderWorkspaceThreads,
+  createBuilderThread,
+  createBuilderWorkspace,
+  deleteBuilderThread,
+  deleteBuilderWorkspace,
+  getBuilderThread,
+  listBuilderWorkspaces,
+  renameBuilderThread,
+  renameBuilderWorkspace,
+  sendBuilderMessage,
+  sendBuilderMessageStream,
+  type BuilderThreadDto,
+  type BuilderWorkspaceDto,
+} from "./builderApi";
+import {
   builderPromptSuggestions,
-  builderThreadGroups,
   type BuilderConversation,
   type BuilderMessage,
   type BuilderThreadGroup,
 } from "./mockBuilderAgent";
-import { createMockBuilderStreamPlan } from "./mockBuilderResponder";
 
-const BUILDER_WORKSPACES_KEY = "builder-workspaces";
-const BUILDER_CONVERSATIONS_KEY = "builder-conversations";
-const BUILDER_MESSAGES_KEY = "builder-messages";
 const BUILDER_COMPOSER_SETTINGS_KEY = "builder-composer-settings";
 
 type PermissionMode = "default" | "full-access";
@@ -25,54 +34,43 @@ interface BuilderComposerSettings {
   attachedFiles: string[];
 }
 
-function formatRelativeNow() {
-  return "now";
-}
-
-function basenameFromPath(path: string) {
-  if (!path) return "workspace";
-  const normalized = path.replace(/\\/g, "/");
-  const parts = normalized.split("/").filter(Boolean);
-  return parts[parts.length - 1] || normalized;
-}
-
-function loadStoredWorkspaces() {
-  if (typeof window === "undefined") return builderThreadGroups;
-
-  try {
-    const stored = window.localStorage.getItem(BUILDER_WORKSPACES_KEY);
-    if (!stored) return builderThreadGroups;
-    const parsed = JSON.parse(stored) as BuilderThreadGroup[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : builderThreadGroups;
-  } catch {
-    return builderThreadGroups;
+function formatRelativeTime(isoValue: string): string {
+  const parsed = new Date(isoValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return "now";
   }
+  const diffMs = Date.now() - parsed.getTime();
+  if (diffMs <= 60_000) return "now";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  return `${Math.max(months, 1)}mo`;
 }
 
-function loadStoredConversations() {
-  if (typeof window === "undefined") return builderConversations;
-
-  try {
-    const stored = window.localStorage.getItem(BUILDER_CONVERSATIONS_KEY);
-    if (!stored) return builderConversations;
-    const parsed = JSON.parse(stored) as BuilderConversation[];
-    return Array.isArray(parsed) ? parsed : builderConversations;
-  } catch {
-    return builderConversations;
-  }
+function mapMessage(message: BuilderThreadDto["messages"][number]): BuilderMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    text: message.text,
+    isStreaming: false,
+  };
 }
 
-function loadStoredMessages() {
-  if (typeof window === "undefined") return builderMessages;
-
-  try {
-    const stored = window.localStorage.getItem(BUILDER_MESSAGES_KEY);
-    if (!stored) return builderMessages;
-    const parsed = JSON.parse(stored) as Record<string, BuilderMessage[]>;
-    return parsed && typeof parsed === "object" ? parsed : builderMessages;
-  } catch {
-    return builderMessages;
-  }
+function mapWorkspace(workspace: BuilderWorkspaceDto): BuilderThreadGroup {
+  return {
+    id: workspace.id,
+    label: workspace.label,
+    path: workspace.path,
+    threads: workspace.threads.map((thread) => ({
+      id: thread.id,
+      title: thread.title,
+      updatedAt: formatRelativeTime(thread.updatedAt),
+    })),
+  };
 }
 
 function loadComposerSettings(): BuilderComposerSettings {
@@ -112,73 +110,91 @@ function loadComposerSettings(): BuilderComposerSettings {
   }
 }
 
-function getTypedReasoningLines(step: [string, string, string], charsVisible: number) {
-  let remaining = charsVisible;
-
-  return step.map((line) => {
-    if (remaining <= 0) return "";
-    const nextLine = line.slice(0, remaining);
-    remaining -= line.length;
-    return nextLine;
-  });
-}
-
-function getReasoningStepLength(step: [string, string, string]) {
-  return step[0].length + step[1].length + step[2].length;
-}
-
 export function useBuilderAgent() {
-  const [threadGroups, setThreadGroups] = useState<BuilderThreadGroup[]>(() => loadStoredWorkspaces());
-  const [conversations, setConversations] = useState<BuilderConversation[]>(() => loadStoredConversations());
-  const [messageMap, setMessageMap] = useState<Record<string, BuilderMessage[]>>(() => loadStoredMessages());
+  const [threadGroups, setThreadGroups] = useState<BuilderThreadGroup[]>([]);
+  const [messageMap, setMessageMap] = useState<Record<string, BuilderMessage[]>>({});
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(() => loadStoredWorkspaces()[0]?.id ?? null);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [previousConversationId, setPreviousConversationId] = useState<string | null>(null);
-  const [expandedWorkspaceIds, setExpandedWorkspaceIds] = useState<string[]>(() => loadStoredWorkspaces().map((group) => group.id));
+  const [expandedWorkspaceIds, setExpandedWorkspaceIds] = useState<string[]>([]);
   const [showAllWorkspaceIds, setShowAllWorkspaceIds] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<"recent" | "alphabetical">("recent");
+  const [isStreaming, setIsStreaming] = useState(false);
   const [composerSettings, setComposerSettings] = useState<BuilderComposerSettings>(() => loadComposerSettings());
-  const streamTimerRef = useRef<number | null>(null);
+  const activeSendAbortRef = useRef<AbortController | null>(null);
+  const activeStreamThreadIdRef = useRef<string | null>(null);
+  const activeStreamAssistantIdRef = useRef<string | null>(null);
+  const streamUnitsRef = useRef<string[]>([]);
+  const streamVisibleTextRef = useRef("");
+  const streamSourceCompletedRef = useRef(true);
+  const streamDrainStartedRef = useRef(false);
+  const streamDrainFrameRef = useRef<number | null>(null);
+  const streamWarmupTimeoutRef = useRef<number | null>(null);
+  const streamDrainResolverRef = useRef<(() => void) | null>(null);
 
-  const persistWorkspaces = (nextWorkspaces: BuilderThreadGroup[]) => {
-    setThreadGroups(nextWorkspaces);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(BUILDER_WORKSPACES_KEY, JSON.stringify(nextWorkspaces));
-    }
-  };
-
-  const persistConversations = (nextConversations: BuilderConversation[]) => {
-    setConversations(nextConversations);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(BUILDER_CONVERSATIONS_KEY, JSON.stringify(nextConversations));
-    }
-  };
-
-  const persistMessages = (nextMessages: Record<string, BuilderMessage[]>) => {
-    setMessageMap(nextMessages);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(BUILDER_MESSAGES_KEY, JSON.stringify(nextMessages));
-    }
-  };
-
-  const persistComposerSettings = (nextSettings: BuilderComposerSettings) => {
+  const persistComposerSettings = useCallback((nextSettings: BuilderComposerSettings) => {
     setComposerSettings(nextSettings);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(BUILDER_COMPOSER_SETTINGS_KEY, JSON.stringify(nextSettings));
     }
-  };
+  }, []);
+
+  const refreshWorkspaces = useCallback(async () => {
+    const workspaces = await listBuilderWorkspaces();
+    const mapped = workspaces.map(mapWorkspace);
+    setThreadGroups(mapped);
+    setExpandedWorkspaceIds((current) => {
+      if (current.length === 0) {
+        return mapped.map((workspace) => workspace.id);
+      }
+      const existing = new Set(mapped.map((workspace) => workspace.id));
+      const filtered = current.filter((item) => existing.has(item));
+      return filtered.length > 0 ? filtered : mapped.map((workspace) => workspace.id);
+    });
+    setCurrentWorkspaceId((current) => {
+      if (current && mapped.some((workspace) => workspace.id === current)) {
+        return current;
+      }
+      return mapped[0]?.id ?? null;
+    });
+  }, []);
+
+  useEffect(() => {
+    void refreshWorkspaces().catch((error) => {
+      console.error("[CodeGuard Builder] Failed to load workspaces", error);
+      setThreadGroups([]);
+    });
+  }, [refreshWorkspaces]);
 
   useEffect(() => {
     return () => {
-      if (streamTimerRef.current) {
-        window.clearInterval(streamTimerRef.current);
+      if (activeSendAbortRef.current) {
+        activeSendAbortRef.current.abort();
+      }
+      if (streamDrainFrameRef.current !== null) {
+        window.cancelAnimationFrame(streamDrainFrameRef.current);
+      }
+      if (streamWarmupTimeoutRef.current !== null) {
+        window.clearTimeout(streamWarmupTimeoutRef.current);
       }
     };
   }, []);
 
+  const conversations = useMemo<BuilderConversation[]>(() => {
+    return threadGroups.flatMap((group) =>
+      group.threads.map((thread) => ({
+        id: thread.id,
+        title: thread.title,
+        subtitle: group.label,
+        groupId: group.id,
+        updatedAt: thread.updatedAt,
+      })),
+    );
+  }, [threadGroups]);
+
   const activeConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
+    () => conversations.find((item) => item.id === activeConversationId) ?? null,
     [activeConversationId, conversations],
   );
 
@@ -191,90 +207,121 @@ export function useBuilderAgent() {
   );
 
   const sortedThreadGroups = useMemo(() => {
-    const normalize = (value: string) => value.toLowerCase();
+    if (sortMode !== "alphabetical") {
+      return threadGroups;
+    }
     return threadGroups.map((group) => ({
       ...group,
-      threads:
-        sortMode === "alphabetical"
-          ? [...group.threads].sort((a, b) => normalize(a.title).localeCompare(normalize(b.title)))
-          : group.threads,
+      threads: [...group.threads].sort((left, right) => left.title.localeCompare(right.title)),
     }));
   }, [sortMode, threadGroups]);
 
   const messages = activeConversationId ? messageMap[activeConversationId] ?? [] : [];
-  const isStreaming = messages.some((message) => message.isStreaming);
 
-  const stopActiveStream = () => {
-    if (streamTimerRef.current) {
-      window.clearInterval(streamTimerRef.current);
-      streamTimerRef.current = null;
+  const markAssistantStopped = useCallback((threadId?: string | null, assistantId?: string | null) => {
+    const resolvedThreadId = threadId ?? activeStreamThreadIdRef.current;
+    const resolvedAssistantId = assistantId ?? activeStreamAssistantIdRef.current;
+    const visibleText = streamVisibleTextRef.current;
+    if (!resolvedThreadId || !resolvedAssistantId) {
+      return;
     }
+    setMessageMap((current) => ({
+      ...current,
+      [resolvedThreadId]: (current[resolvedThreadId] ?? []).map((item) => (
+        item.id === resolvedAssistantId
+          ? {
+              ...item,
+              text: visibleText || item.text,
+              isStreaming: false,
+            }
+          : item
+      )),
+    }));
+  }, []);
 
-    const latest = loadStoredMessages();
-    const nextMessages = Object.fromEntries(
-      Object.entries(latest).map(([conversationId, conversationMessages]) => [
-        conversationId,
-        conversationMessages.filter((message) => !(message.isStreaming && !message.text.trim())).map((message) =>
-          message.isStreaming
-            ? {
-                ...message,
-                reasoningLines: [],
-                isStreaming: false,
-              }
-            : message,
-        ),
-      ]),
-    ) as Record<string, BuilderMessage[]>;
+  const markActiveAssistantStopped = useCallback(() => {
+    const threadId = activeStreamThreadIdRef.current;
+    const assistantId = activeStreamAssistantIdRef.current;
+    if (!threadId || !assistantId) {
+      return;
+    }
+    markAssistantStopped(threadId, assistantId);
+  }, [markAssistantStopped]);
 
-    persistMessages(nextMessages);
-  };
+  const stopActiveStream = useCallback(() => {
+    if (activeSendAbortRef.current) {
+      activeSendAbortRef.current.abort();
+      activeSendAbortRef.current = null;
+    }
+    if (streamDrainFrameRef.current !== null) {
+      window.cancelAnimationFrame(streamDrainFrameRef.current);
+      streamDrainFrameRef.current = null;
+    }
+    if (streamWarmupTimeoutRef.current !== null) {
+      window.clearTimeout(streamWarmupTimeoutRef.current);
+      streamWarmupTimeoutRef.current = null;
+    }
+    streamSourceCompletedRef.current = true;
+    streamDrainStartedRef.current = false;
+    streamUnitsRef.current = [];
+    markActiveAssistantStopped();
+    if (streamDrainResolverRef.current) {
+      streamDrainResolverRef.current();
+      streamDrainResolverRef.current = null;
+    }
+    setIsStreaming(false);
+  }, [markActiveAssistantStopped]);
 
-  const stopStreaming = () => {
-    stopActiveStream();
-  };
-
-  const openConversation = (conversationId: string) => {
+  const openConversation = useCallback(async (conversationId: string) => {
     if (activeConversationId && activeConversationId !== conversationId) {
       setPreviousConversationId(activeConversationId);
     }
-
     const conversation = conversations.find((item) => item.id === conversationId);
     setActiveConversationId(conversationId);
     if (conversation) {
       setCurrentWorkspaceId(conversation.groupId);
-      setExpandedWorkspaceIds((current) =>
-        current.includes(conversation.groupId) ? current : [...current, conversation.groupId],
-      );
+      setExpandedWorkspaceIds((current) => (current.includes(conversation.groupId) ? current : [...current, conversation.groupId]));
     }
-  };
+    if (!messageMap[conversationId]) {
+      try {
+        const detail = await getBuilderThread(conversationId);
+        setMessageMap((current) => ({
+          ...current,
+          [conversationId]: detail.messages.map(mapMessage),
+        }));
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to open conversation", error);
+      }
+    }
+  }, [activeConversationId, conversations, messageMap]);
 
-  const startNewChat = (workspaceId?: string) => {
+  const startNewChat = useCallback((workspaceId?: string) => {
     if (activeConversationId) {
       setPreviousConversationId(activeConversationId);
     }
-
     const targetWorkspaceId = workspaceId ?? currentWorkspace?.id ?? threadGroups[0]?.id ?? null;
     if (targetWorkspaceId) {
       setCurrentWorkspaceId(targetWorkspaceId);
-      setExpandedWorkspaceIds((current) =>
-        current.includes(targetWorkspaceId) ? current : [...current, targetWorkspaceId],
-      );
+      setExpandedWorkspaceIds((current) => (current.includes(targetWorkspaceId) ? current : [...current, targetWorkspaceId]));
     }
-
     setActiveConversationId(null);
     setDraft("");
-  };
+  }, [activeConversationId, currentWorkspace?.id, threadGroups]);
 
   const toggleWorkspace = (workspaceId: string) => {
-    setExpandedWorkspaceIds((current) =>
-      current.includes(workspaceId) ? current.filter((id) => id !== workspaceId) : [...current, workspaceId],
-    );
+    setExpandedWorkspaceIds((current) => (
+      current.includes(workspaceId)
+        ? current.filter((id) => id !== workspaceId)
+        : [...current, workspaceId]
+    ));
   };
 
   const toggleWorkspaceShowAll = (workspaceId: string) => {
-    setShowAllWorkspaceIds((current) =>
-      current.includes(workspaceId) ? current.filter((id) => id !== workspaceId) : [...current, workspaceId],
-    );
+    setShowAllWorkspaceIds((current) => (
+      current.includes(workspaceId)
+        ? current.filter((id) => id !== workspaceId)
+        : [...current, workspaceId]
+    ));
   };
 
   const collapseAllWorkspaces = () => setExpandedWorkspaceIds([]);
@@ -282,7 +329,7 @@ export function useBuilderAgent() {
 
   const reopenPreviousConversation = () => {
     if (!previousConversationId) return;
-    openConversation(previousConversationId);
+    void openConversation(previousConversationId);
   };
 
   const toggleSortMode = () => {
@@ -294,97 +341,88 @@ export function useBuilderAgent() {
       const canBrowse = typeof window !== "undefined" && typeof window.electronAPI?.pickPath === "function";
       const picked = canBrowse ? await window.electronAPI?.pickPath?.("folder") : window.prompt("Project folder path")?.trim() ?? null;
       if (!picked) return;
-
       const normalizedPath = picked.trim();
-      const existing = threadGroups.find((group) => group.path === normalizedPath);
-      if (existing) {
-        setCurrentWorkspaceId(existing.id);
-        setExpandedWorkspaceIds((current) => (current.includes(existing.id) ? current : [...current, existing.id]));
+      if (!normalizedPath) return;
+
+      try {
+        const workspace = await createBuilderWorkspace(normalizedPath);
+        await refreshWorkspaces();
+        setCurrentWorkspaceId(workspace.id);
+        setExpandedWorkspaceIds((current) => (current.includes(workspace.id) ? current : [...current, workspace.id]));
         setActiveConversationId(null);
-        return;
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to create workspace", error);
       }
-
-      const nextId = `workspace-${Date.now()}`;
-      const nextWorkspace: BuilderThreadGroup = {
-        id: nextId,
-        label: basenameFromPath(normalizedPath),
-        path: normalizedPath,
-        threads: [],
-      };
-
-      persistWorkspaces([...threadGroups, nextWorkspace]);
-      setExpandedWorkspaceIds((current) => [...current, nextId]);
-      setCurrentWorkspaceId(nextId);
-      setActiveConversationId(null);
-      setDraft("");
     })();
   };
 
   const renameWorkspace = (workspaceId: string) => {
     const workspace = threadGroups.find((group) => group.id === workspaceId);
     if (!workspace) return;
-
     const nextLabel = window.prompt("Rename workspace", workspace.label)?.trim();
     if (!nextLabel) return;
 
-    persistWorkspaces(
-      threadGroups.map((group) => (group.id === workspaceId ? { ...group, label: nextLabel } : group)),
-    );
-    persistConversations(
-      conversations.map((conversation) =>
-        conversation.groupId === workspaceId ? { ...conversation, subtitle: nextLabel } : conversation,
-      ),
-    );
+    void (async () => {
+      try {
+        await renameBuilderWorkspace(workspaceId, nextLabel);
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to rename workspace", error);
+      }
+    })();
   };
 
   const archiveWorkspaceThreads = (workspaceId: string) => {
-    persistWorkspaces(threadGroups.map((group) => (group.id === workspaceId ? { ...group, threads: [] } : group)));
-    persistConversations(conversations.filter((conversation) => conversation.groupId !== workspaceId));
-
-    const nextMessageMap = { ...messageMap };
-    for (const conversation of conversations) {
-      if (conversation.groupId === workspaceId) {
-        delete nextMessageMap[conversation.id];
+    void (async () => {
+      try {
+        const workspace = threadGroups.find((group) => group.id === workspaceId);
+        const threadIds = workspace ? workspace.threads.map((thread) => thread.id) : [];
+        await archiveBuilderWorkspaceThreads(workspaceId);
+        setMessageMap((current) => {
+          const next = { ...current };
+          for (const threadId of threadIds) {
+            delete next[threadId];
+          }
+          return next;
+        });
+        if (activeConversationId && threadIds.includes(activeConversationId)) {
+          setActiveConversationId(null);
+          setDraft("");
+        }
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to archive workspace threads", error);
       }
-    }
-    persistMessages(nextMessageMap);
-
-    if (activeConversation?.groupId === workspaceId) {
-      setActiveConversationId(null);
-      setDraft("");
-    }
+    })();
   };
 
   const removeWorkspace = (workspaceId: string) => {
-    const fallbackWorkspace = threadGroups.find((group) => group.id !== workspaceId) ?? null;
-
-    persistWorkspaces(threadGroups.filter((group) => group.id !== workspaceId));
-    persistConversations(conversations.filter((conversation) => conversation.groupId !== workspaceId));
-    const nextMessageMap = { ...messageMap };
-    for (const conversation of conversations) {
-      if (conversation.groupId === workspaceId) {
-        delete nextMessageMap[conversation.id];
+    void (async () => {
+      try {
+        const workspace = threadGroups.find((group) => group.id === workspaceId);
+        const threadIds = workspace ? workspace.threads.map((thread) => thread.id) : [];
+        await deleteBuilderWorkspace(workspaceId);
+        setMessageMap((current) => {
+          const next = { ...current };
+          for (const threadId of threadIds) {
+            delete next[threadId];
+          }
+          return next;
+        });
+        if (activeConversationId && threadIds.includes(activeConversationId)) {
+          setActiveConversationId(null);
+          setDraft("");
+        }
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to remove workspace", error);
       }
-    }
-    persistMessages(nextMessageMap);
-    setExpandedWorkspaceIds((current) => current.filter((id) => id !== workspaceId));
-    setShowAllWorkspaceIds((current) => current.filter((id) => id !== workspaceId));
-
-    if (currentWorkspaceId === workspaceId) {
-      setCurrentWorkspaceId(fallbackWorkspace?.id ?? null);
-    }
-
-    if (activeConversation?.groupId === workspaceId) {
-      setActiveConversationId(null);
-      setDraft("");
-    }
+    })();
   };
 
   const openWorkspaceInExplorer = (workspaceId: string) => {
     const workspace = threadGroups.find((group) => group.id === workspaceId);
-    if (!workspace) return;
-
-    if (typeof window === "undefined") return;
+    if (!workspace || typeof window === "undefined") return;
 
     const normalized = workspace.path.replace(/\\/g, "/");
     const fileUrl = normalized.startsWith("/") ? `file://${normalized}` : `file:///${normalized}`;
@@ -398,22 +436,36 @@ export function useBuilderAgent() {
     }
   };
 
-  const createPermanentWorktree = (workspaceId: string) => {
-    const workspace = threadGroups.find((group) => group.id === workspaceId);
-    if (!workspace) return;
+  const createPermanentWorktree = (_workspaceId: string) => {
+    // Future backend capability.
   };
 
   const createWorkspaceThread = (workspaceId: string) => {
-    startNewChat(workspaceId);
+    void (async () => {
+      try {
+        const detail = await createBuilderThread(workspaceId);
+        setCurrentWorkspaceId(workspaceId);
+        setActiveConversationId(detail.id);
+        setExpandedWorkspaceIds((current) => (current.includes(workspaceId) ? current : [...current, workspaceId]));
+        setMessageMap((current) => ({
+          ...current,
+          [detail.id]: detail.messages.map(mapMessage),
+        }));
+        setDraft("");
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to create workspace thread", error);
+      }
+    })();
   };
 
   const reorderWorkspaces = (orderedWorkspaceIds: string[]) => {
+    const index = new Map(threadGroups.map((group) => [group.id, group]));
     const nextGroups = orderedWorkspaceIds
-      .map((workspaceId) => threadGroups.find((group) => group.id === workspaceId) ?? null)
+      .map((workspaceId) => index.get(workspaceId) ?? null)
       .filter((group): group is BuilderThreadGroup => group !== null);
-
     if (nextGroups.length !== threadGroups.length) return;
-    persistWorkspaces(nextGroups);
+    setThreadGroups(nextGroups);
   };
 
   const addAttachment = () => {
@@ -421,14 +473,12 @@ export function useBuilderAgent() {
       const canBrowse = typeof window !== "undefined" && typeof window.electronAPI?.pickPath === "function";
       const picked = canBrowse ? await window.electronAPI?.pickPath?.("file") : window.prompt("File path")?.trim() ?? null;
       if (!picked) return;
-
       const normalizedPath = picked.trim();
       if (!normalizedPath) return;
 
       const nextFiles = composerSettings.attachedFiles.includes(normalizedPath)
         ? composerSettings.attachedFiles
         : [...composerSettings.attachedFiles, normalizedPath];
-
       persistComposerSettings({
         ...composerSettings,
         attachedFiles: nextFiles,
@@ -465,212 +515,344 @@ export function useBuilderAgent() {
   };
 
   const renameThread = (threadId: string) => {
-    const thread = conversations.find((conversation) => conversation.id === threadId);
+    const thread = conversations.find((item) => item.id === threadId);
     if (!thread) return;
-
     const nextTitle = window.prompt("Rename chat", thread.title)?.trim();
     if (!nextTitle) return;
 
-    persistConversations(
-      conversations.map((conversation) => (conversation.id === threadId ? { ...conversation, title: nextTitle } : conversation)),
-    );
-    persistWorkspaces(
-      threadGroups.map((group) =>
-        group.id === thread.groupId
-          ? {
-              ...group,
-              threads: group.threads.map((item) => (item.id === threadId ? { ...item, title: nextTitle } : item)),
-            }
-          : group,
-      ),
-    );
+    void (async () => {
+      try {
+        const detail = await renameBuilderThread(threadId, nextTitle);
+        setMessageMap((current) => ({
+          ...current,
+          [detail.id]: detail.messages.map(mapMessage),
+        }));
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to rename thread", error);
+      }
+    })();
   };
 
   const removeThread = (threadId: string) => {
-    const thread = conversations.find((conversation) => conversation.id === threadId);
-    if (!thread) return;
-
-    persistConversations(conversations.filter((conversation) => conversation.id !== threadId));
-    persistWorkspaces(
-      threadGroups.map((group) =>
-        group.id === thread.groupId
-          ? {
-              ...group,
-              threads: group.threads.filter((item) => item.id !== threadId),
-            }
-          : group,
-      ),
-    );
-    const nextMessageMap = { ...messageMap };
-    delete nextMessageMap[threadId];
-    persistMessages(nextMessageMap);
-
-    if (activeConversationId === threadId) {
-      setActiveConversationId(null);
-      setDraft("");
-    }
+    void (async () => {
+      try {
+        await deleteBuilderThread(threadId);
+        setMessageMap((current) => {
+          const next = { ...current };
+          delete next[threadId];
+          return next;
+        });
+        if (activeConversationId === threadId) {
+          setActiveConversationId(null);
+          setDraft("");
+        }
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to delete thread", error);
+      }
+    })();
   };
 
   const archiveThread = (threadId: string) => {
-    removeThread(threadId);
-  };
-
-  const startStreamingReply = (conversationId: string, prompt: string) => {
-    stopActiveStream();
-
-    const plan = createMockBuilderStreamPlan(prompt);
-    const assistantId = `assistant-${Date.now()}`;
-    let phase: "reasoning" | "response" = "reasoning";
-    let reasoningIndex = 0;
-    let reasoningCharsVisible = 0;
-    let reasoningHoldTicks = 0;
-    let responseCharIndex = 0;
-
-    const latestMessages = loadStoredMessages();
-    const seededMessages = {
-      ...latestMessages,
-      [conversationId]: [
-        ...(latestMessages[conversationId] ?? []),
-        {
-          id: assistantId,
-          role: "assistant",
-          text: "",
-          reasoningLines: [],
-          isStreaming: true,
-        },
-      ],
-    };
-    persistMessages(seededMessages);
-
-    streamTimerRef.current = window.setInterval(() => {
-      const latest = loadStoredMessages();
-
-      if (phase === "reasoning") {
-        const currentStep = plan.reasoning[reasoningIndex];
-        if (!currentStep) {
-          phase = "response";
-          return;
-        }
-
-        const stepLength = getReasoningStepLength(currentStep);
-        const isStepComplete = reasoningCharsVisible >= stepLength;
-
-        if (!isStepComplete) {
-          reasoningCharsVisible += 3;
-        } else {
-          reasoningHoldTicks += 1;
-        }
-
-        const visibleReasoning = getTypedReasoningLines(currentStep, reasoningCharsVisible);
-
-        persistMessages({
-          ...latest,
-          [conversationId]: (latest[conversationId] ?? []).map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  reasoningLines: visibleReasoning,
-                  isStreaming: true,
-                }
-              : message,
-          ),
+    void (async () => {
+      try {
+        await archiveBuilderThread(threadId);
+        setMessageMap((current) => {
+          const next = { ...current };
+          delete next[threadId];
+          return next;
         });
-
-        if (isStepComplete && reasoningHoldTicks >= 14) {
-          reasoningIndex += 1;
-          reasoningCharsVisible = 0;
-          reasoningHoldTicks = 0;
+        if (activeConversationId === threadId) {
+          setActiveConversationId(null);
+          setDraft("");
         }
-
-        if (reasoningIndex >= plan.reasoning.length) {
-          phase = "response";
-        }
-        return;
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("[CodeGuard Builder] Failed to archive thread", error);
       }
-
-      responseCharIndex += 4;
-      const nextText = plan.response.slice(0, responseCharIndex);
-      const completed = responseCharIndex >= plan.response.length;
-
-      persistMessages({
-        ...latest,
-        [conversationId]: (latest[conversationId] ?? []).map((message) => {
-          if (message.id !== assistantId) return message;
-          return {
-            ...message,
-            reasoningLines: [],
-            text: nextText,
-            isStreaming: !completed,
-          };
-        }),
-      });
-
-      if (completed && streamTimerRef.current) {
-        window.clearInterval(streamTimerRef.current);
-        streamTimerRef.current = null;
-      }
-    }, 22);
+    })();
   };
 
   const sendMessage = () => {
-    const prompt = draft.trim();
-    if (!prompt || !currentWorkspace) return;
+    void (async () => {
+      const prompt = draft.trim();
+      if (!prompt || !currentWorkspace) return;
 
-    let conversationId = activeConversationId;
+      let threadId = activeConversationId;
+      if (!threadId) {
+        try {
+          const created = await createBuilderThread(currentWorkspace.id, prompt.slice(0, 96));
+          threadId = created.id;
+          setActiveConversationId(created.id);
+          setCurrentWorkspaceId(created.workspaceId);
+          setMessageMap((current) => ({
+            ...current,
+            [created.id]: created.messages.map(mapMessage),
+          }));
+        } catch (error) {
+          console.error("[CodeGuard Builder] Failed to bootstrap chat thread", error);
+          return;
+        }
+      }
+      if (!threadId) return;
 
-    if (!conversationId) {
-      conversationId = `thread-${Date.now()}`;
-      const updatedAt = formatRelativeNow();
-      const nextConversation: BuilderConversation = {
-        id: conversationId,
-        title: prompt,
-        subtitle: currentWorkspace.label,
-        groupId: currentWorkspace.id,
-        updatedAt,
+      const optimisticUserMessage: BuilderMessage = {
+        id: `local-user-${Date.now()}`,
+        role: "user",
+        text: prompt,
       };
+      const optimisticAssistantId = `local-assistant-${Date.now() + 1}`;
+      setMessageMap((current) => ({
+        ...current,
+        [threadId!]: [
+          ...(current[threadId!] ?? []),
+          optimisticUserMessage,
+          {
+            id: optimisticAssistantId,
+            role: "assistant",
+            text: "",
+            isStreaming: true,
+          },
+        ],
+      }));
+      setDraft("");
 
-      persistConversations([nextConversation, ...conversations]);
-      persistWorkspaces(
-        threadGroups.map((group) =>
-          group.id === currentWorkspace.id
-            ? {
-                ...group,
-                threads: [{ id: conversationId!, title: prompt, updatedAt }, ...group.threads],
-              }
-            : group,
-        ),
-      );
-      setActiveConversationId(conversationId);
-    } else {
-      persistWorkspaces(
-        threadGroups.map((group) =>
-          group.id === currentWorkspace.id
-            ? {
-                ...group,
-                threads: group.threads.map((thread) =>
-                  thread.id === conversationId ? { ...thread, updatedAt: formatRelativeNow() } : thread,
-                ),
-              }
-            : group,
-        ),
-      );
-    }
+      const abortController = new AbortController();
+      activeSendAbortRef.current = abortController;
+      activeStreamThreadIdRef.current = threadId;
+      activeStreamAssistantIdRef.current = optimisticAssistantId;
+      setIsStreaming(true);
+      streamUnitsRef.current = [];
+      streamVisibleTextRef.current = "";
+      streamSourceCompletedRef.current = false;
+      streamDrainStartedRef.current = false;
 
-    const latestMessages = loadStoredMessages();
-    const nextMessages = {
-      ...latestMessages,
-      [conversationId]: [
-        ...(latestMessages[conversationId] ?? []),
-        {
-          id: `user-${Date.now()}`,
-          role: "user",
-          text: prompt,
-        },
-      ],
-    };
-    persistMessages(nextMessages);
-    setDraft("");
-    startStreamingReply(conversationId, prompt);
+      try {
+        const payload = {
+          workspaceId: currentWorkspace.id,
+          threadId,
+          message: prompt,
+          permissionMode: composerSettings.permissionMode,
+          planMode: composerSettings.planMode,
+          responseSpeed: composerSettings.responseSpeed,
+        } as const;
+
+        const pushVisibleText = (nextText: string) => {
+          streamVisibleTextRef.current = nextText;
+          setMessageMap((current) => ({
+            ...current,
+            [threadId!]: (current[threadId!] ?? []).map((item) => (
+              item.id === optimisticAssistantId
+                ? { ...item, text: nextText }
+                : item
+            )),
+          }));
+        };
+
+        const clearWarmupTimer = () => {
+          if (streamWarmupTimeoutRef.current !== null) {
+            window.clearTimeout(streamWarmupTimeoutRef.current);
+            streamWarmupTimeoutRef.current = null;
+          }
+        };
+
+        const resolveDrainWaiter = () => {
+          if (streamDrainResolverRef.current) {
+            streamDrainResolverRef.current();
+            streamDrainResolverRef.current = null;
+          }
+        };
+
+        const finishDrainIfIdle = () => {
+          if (streamUnitsRef.current.length > 0) {
+            return;
+          }
+          if (!streamSourceCompletedRef.current) {
+            return;
+          }
+          if (streamDrainFrameRef.current !== null) {
+            return;
+          }
+          clearWarmupTimer();
+          resolveDrainWaiter();
+        };
+
+        const drainBufferedText = () => {
+          streamDrainFrameRef.current = null;
+
+          if (abortController.signal.aborted || activeSendAbortRef.current !== abortController) {
+            finishDrainIfIdle();
+            return;
+          }
+
+          const bufferLength = streamUnitsRef.current.length;
+          if (!streamDrainStartedRef.current) {
+            const shouldStart =
+              streamSourceCompletedRef.current || bufferLength >= STREAM_REVEAL_START_BUFFER;
+            if (!shouldStart) {
+              return;
+            }
+            streamDrainStartedRef.current = true;
+          }
+
+          if (bufferLength === 0) {
+            if (streamSourceCompletedRef.current) {
+              finishDrainIfIdle();
+              return;
+            }
+            streamDrainFrameRef.current = window.requestAnimationFrame(drainBufferedText);
+            return;
+          }
+
+          const batchSize = resolveStreamRevealBatchSize(bufferLength, streamSourceCompletedRef.current);
+          const nextChunk = streamUnitsRef.current.splice(0, batchSize).join("");
+          if (nextChunk) {
+            pushVisibleText(streamVisibleTextRef.current + nextChunk);
+          }
+
+          if (streamUnitsRef.current.length === 0 && streamSourceCompletedRef.current) {
+            finishDrainIfIdle();
+            return;
+          }
+
+          streamDrainFrameRef.current = window.requestAnimationFrame(drainBufferedText);
+        };
+
+        const startDrain = () => {
+          clearWarmupTimer();
+          streamDrainStartedRef.current = true;
+          if (streamDrainFrameRef.current === null) {
+            streamDrainFrameRef.current = window.requestAnimationFrame(drainBufferedText);
+          }
+        };
+
+        const ensureWarmup = () => {
+          if (streamDrainStartedRef.current || streamWarmupTimeoutRef.current !== null) {
+            return;
+          }
+          streamWarmupTimeoutRef.current = window.setTimeout(() => {
+            streamWarmupTimeoutRef.current = null;
+            if (abortController.signal.aborted || activeSendAbortRef.current !== abortController) {
+              return;
+            }
+            startDrain();
+          }, STREAM_REVEAL_WARMUP_MS);
+        };
+
+        const enqueueToken = (token: string) => {
+          streamUnitsRef.current.push(...splitStreamDisplayUnits(token));
+          if (!streamDrainStartedRef.current) {
+            if (streamUnitsRef.current.length >= STREAM_REVEAL_START_BUFFER) {
+              startDrain();
+            } else {
+              ensureWarmup();
+            }
+            return;
+          }
+          if (streamDrainFrameRef.current === null) {
+            streamDrainFrameRef.current = window.requestAnimationFrame(drainBufferedText);
+          }
+        };
+
+        const waitForDrain = async () => {
+          streamSourceCompletedRef.current = true;
+          clearWarmupTimer();
+          if (!streamDrainStartedRef.current) {
+            startDrain();
+          } else if (streamDrainFrameRef.current === null) {
+            streamDrainFrameRef.current = window.requestAnimationFrame(drainBufferedText);
+          }
+          if (streamUnitsRef.current.length === 0 && streamDrainFrameRef.current === null) {
+            return;
+          }
+          await new Promise<void>((resolve) => {
+            streamDrainResolverRef.current = resolve;
+          });
+        };
+
+        let result = await sendBuilderMessageStream(
+          payload,
+          {
+            onToken: (token) => {
+              enqueueToken(token);
+            },
+            onReasoning: () => {
+              // Builder chat should stream only the visible assistant answer.
+            },
+          },
+          abortController.signal,
+        );
+        await waitForDrain();
+
+        if (!result) {
+          result = await sendBuilderMessage(payload, abortController.signal);
+        }
+
+        setMessageMap((current) => ({
+          ...current,
+          [result.thread.id]: result.thread.messages.map(mapMessage),
+        }));
+        setActiveConversationId(result.thread.id);
+        setCurrentWorkspaceId(result.thread.workspaceId);
+        await refreshWorkspaces();
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+        try {
+          const result = await sendBuilderMessage(
+            {
+              workspaceId: currentWorkspace.id,
+              threadId,
+              message: prompt,
+              permissionMode: composerSettings.permissionMode,
+              planMode: composerSettings.planMode,
+              responseSpeed: composerSettings.responseSpeed,
+            },
+            abortController.signal,
+          );
+          setMessageMap((current) => ({
+            ...current,
+            [result.thread.id]: result.thread.messages.map(mapMessage),
+          }));
+          setActiveConversationId(result.thread.id);
+          setCurrentWorkspaceId(result.thread.workspaceId);
+          await refreshWorkspaces();
+        } catch (fallbackError) {
+          console.error("[CodeGuard Builder] Failed to send message", fallbackError ?? error);
+        }
+      } finally {
+        if (streamDrainFrameRef.current !== null) {
+          window.cancelAnimationFrame(streamDrainFrameRef.current);
+          streamDrainFrameRef.current = null;
+        }
+        if (streamWarmupTimeoutRef.current !== null) {
+          window.clearTimeout(streamWarmupTimeoutRef.current);
+          streamWarmupTimeoutRef.current = null;
+        }
+        streamUnitsRef.current = [];
+        streamSourceCompletedRef.current = true;
+        streamDrainStartedRef.current = false;
+        if (streamDrainResolverRef.current) {
+          streamDrainResolverRef.current();
+          streamDrainResolverRef.current = null;
+        }
+        markAssistantStopped(threadId, optimisticAssistantId);
+        streamVisibleTextRef.current = "";
+        if (
+          activeStreamThreadIdRef.current === threadId &&
+          activeStreamAssistantIdRef.current === optimisticAssistantId
+        ) {
+          activeStreamThreadIdRef.current = null;
+          activeStreamAssistantIdRef.current = null;
+        }
+        if (activeSendAbortRef.current === abortController) {
+          activeSendAbortRef.current = null;
+          setIsStreaming(false);
+        }
+      }
+    })();
   };
 
   return {
@@ -705,7 +887,7 @@ export function useBuilderAgent() {
     reopenPreviousConversation,
     removeAttachment,
     sendMessage,
-    stopStreaming,
+    stopStreaming: stopActiveStream,
     setPermissionMode,
     setPlanMode,
     setResponseSpeed,
@@ -715,4 +897,30 @@ export function useBuilderAgent() {
     toggleWorkspace,
     toggleWorkspaceShowAll,
   };
+}
+
+function splitStreamDisplayUnits(text: string): string[] {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter !== "undefined") {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    return Array.from(segmenter.segment(text), (item) => item.segment);
+  }
+  return Array.from(text);
+}
+
+const STREAM_REVEAL_START_BUFFER = 32;
+const STREAM_REVEAL_WARMUP_MS = 160;
+
+function resolveStreamRevealBatchSize(bufferLength: number, sourceCompleted: boolean): number {
+  if (sourceCompleted) {
+    if (bufferLength > 160) return 10;
+    if (bufferLength > 96) return 7;
+    if (bufferLength > 48) return 5;
+    if (bufferLength > 24) return 3;
+    if (bufferLength > 10) return 2;
+    return 1;
+  }
+  if (bufferLength > 160) return 4;
+  if (bufferLength > 96) return 3;
+  if (bufferLength > 40) return 2;
+  return 1;
 }

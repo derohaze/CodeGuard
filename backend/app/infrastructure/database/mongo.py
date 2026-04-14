@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from pymongo import AsyncMongoClient
 
@@ -8,12 +9,14 @@ from app.core.config import get_settings
 _mongo_client: AsyncMongoClient | None = None
 _mongo_database = None
 _mongo_lock = asyncio.Lock()
+_mongo_uri_in_use: str | None = None
+logger = logging.getLogger(__name__)
 
 
-def _build_client() -> AsyncMongoClient:
+def _build_client(uri: str | None = None) -> AsyncMongoClient:
     settings = get_settings()
     return AsyncMongoClient(
-        settings.mongodb_uri,
+        uri or settings.mongodb_uri,
         maxPoolSize=settings.mongodb_max_pool_size,
         minPoolSize=settings.mongodb_min_pool_size,
         serverSelectionTimeoutMS=settings.mongodb_server_selection_timeout_ms,
@@ -21,8 +24,17 @@ def _build_client() -> AsyncMongoClient:
     )
 
 
+def _candidate_uris() -> list[str]:
+    settings = get_settings()
+    uris: list[str] = [settings.mongodb_uri]
+    fallback_uri = settings.mongodb_fallback_uri
+    if fallback_uri and fallback_uri not in uris:
+        uris.append(fallback_uri)
+    return uris
+
+
 async def initialize_mongo():
-    global _mongo_client, _mongo_database
+    global _mongo_client, _mongo_database, _mongo_uri_in_use
     if _mongo_database is not None:
         return _mongo_database
 
@@ -30,20 +42,40 @@ async def initialize_mongo():
         if _mongo_database is not None:
             return _mongo_database
         settings = get_settings()
-        client = _build_client()
-        database = client[settings.mongodb_database]
-        await database.command("ping")
-        _mongo_client = client
-        _mongo_database = database
-        return _mongo_database
+        errors: list[tuple[str, Exception]] = []
+        for uri in _candidate_uris():
+            client = _build_client(uri)
+            database = client[settings.mongodb_database]
+            try:
+                await database.command("ping")
+                _mongo_client = client
+                _mongo_database = database
+                _mongo_uri_in_use = uri
+                return _mongo_database
+            except Exception as exc:
+                errors.append((uri, exc))
+                await client.close()
+
+        failure_details = "; ".join(f"{uri}: {type(exc).__name__}" for uri, exc in errors)
+        logger.error("Failed to initialize MongoDB for all configured URIs: %s", failure_details)
+        raise RuntimeError("Failed to initialize MongoDB connection.") from errors[-1][1]
 
 
 def get_database():
-    global _mongo_client, _mongo_database
+    global _mongo_client, _mongo_database, _mongo_uri_in_use
     if _mongo_database is None:
         settings = get_settings()
-        _mongo_client = _build_client()
-        _mongo_database = _mongo_client[settings.mongodb_database]
+        last_error: Exception | None = None
+        for uri in _candidate_uris():
+            try:
+                _mongo_client = _build_client(uri)
+                _mongo_database = _mongo_client[settings.mongodb_database]
+                _mongo_uri_in_use = uri
+                break
+            except Exception as exc:
+                last_error = exc
+        if _mongo_database is None and last_error is not None:
+            raise RuntimeError("MongoDB client is not available for the configured URIs.") from last_error
     return _mongo_database
 
 
@@ -57,8 +89,9 @@ async def ping_mongo() -> bool:
 
 
 async def close_mongo() -> None:
-    global _mongo_client, _mongo_database
+    global _mongo_client, _mongo_database, _mongo_uri_in_use
     if _mongo_client is not None:
         await _mongo_client.close()
     _mongo_client = None
     _mongo_database = None
+    _mongo_uri_in_use = None

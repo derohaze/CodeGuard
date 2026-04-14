@@ -56,6 +56,12 @@ class MongoManagerTests(unittest.TestCase):
         ingestion_audit.create_index = AsyncMock()
         runtime_settings = MagicMock()
         runtime_settings.create_index = AsyncMock()
+        builder_workspaces = MagicMock()
+        builder_workspaces.create_index = AsyncMock()
+        builder_threads = MagicMock()
+        builder_threads.create_index = AsyncMock()
+        builder_messages = MagicMock()
+        builder_messages.create_index = AsyncMock()
         database = {
             "scan_sessions": scan_sessions,
             "scan_jobs": scan_jobs,
@@ -77,6 +83,9 @@ class MongoManagerTests(unittest.TestCase):
             "normalization_failures": normalization_failures,
             "ingestion_audit": ingestion_audit,
             "runtime_settings": runtime_settings,
+            "builder_workspaces": builder_workspaces,
+            "builder_threads": builder_threads,
+            "builder_messages": builder_messages,
         }
         with patch("app.infrastructure.database.mongo_manager.get_database", return_value=database):
             asyncio.run(ensure_mongo_indexes())
@@ -96,6 +105,9 @@ class MongoManagerTests(unittest.TestCase):
         self.assertIn("ux_findings_session_kind_finding_id", finding_index_names)
         benchmark_case_index_names = [call.kwargs.get("name") for call in benchmark_cases.create_index.call_args_list]
         self.assertIn("ux_benchmark_cases_suite_fingerprint", benchmark_case_index_names)
+        builder_workspace_index_names = [call.kwargs.get("name") for call in builder_workspaces.create_index.call_args_list]
+        self.assertIn("ux_builder_workspaces_workspace_id", builder_workspace_index_names)
+        self.assertIn("ux_builder_workspaces_active_path", builder_workspace_index_names)
 
     def test_backend_bootstrap_creates_missing_collections(self):
         database = MagicMock()
@@ -123,6 +135,9 @@ class MongoManagerTests(unittest.TestCase):
             "normalization_failures",
             "ingestion_audit",
             "runtime_settings",
+            "builder_workspaces",
+            "builder_threads",
+            "builder_messages",
         ):
             collection = MagicMock()
             collection.create_index = AsyncMock()

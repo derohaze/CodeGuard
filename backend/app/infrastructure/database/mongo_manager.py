@@ -10,6 +10,9 @@ from app.infrastructure.database.collections import (
     BENCHMARK_CASES_COLLECTION,
     BENCHMARK_RUNS_COLLECTION,
     BENCHMARK_SUITES_COLLECTION,
+    BUILDER_MESSAGES_COLLECTION,
+    BUILDER_THREADS_COLLECTION,
+    BUILDER_WORKSPACES_COLLECTION,
     EXTERNAL_KNOWLEDGE_CHUNKS_COLLECTION,
     EXTERNAL_KNOWLEDGE_ITEMS_COLLECTION,
     EXTERNAL_KNOWLEDGE_SOURCES_COLLECTION,
@@ -190,6 +193,26 @@ async def ensure_mongo_indexes() -> None:
 
     runtime_settings = database[RUNTIME_SETTINGS_COLLECTION]
     await runtime_settings.create_index([("updated_at", DESCENDING)], name="idx_runtime_settings_updated_at_desc")
+
+    builder_workspaces = database[BUILDER_WORKSPACES_COLLECTION]
+    await builder_workspaces.create_index([("workspace_id", 1)], name="ux_builder_workspaces_workspace_id", unique=True)
+    await builder_workspaces.create_index(
+        [("path", 1)],
+        name="ux_builder_workspaces_active_path",
+        unique=True,
+        partialFilterExpression={"archived": False},
+    )
+    await builder_workspaces.create_index([("updated_at", DESCENDING)], name="idx_builder_workspaces_updated_at_desc")
+
+    builder_threads = database[BUILDER_THREADS_COLLECTION]
+    await builder_threads.create_index([("thread_id", 1)], name="ux_builder_threads_thread_id", unique=True)
+    await builder_threads.create_index([("workspace_id", 1), ("updated_at", DESCENDING)], name="idx_builder_threads_workspace_updated_at_desc")
+    await builder_threads.create_index([("archived", 1), ("updated_at", DESCENDING)], name="idx_builder_threads_archived_updated_at_desc")
+
+    builder_messages = database[BUILDER_MESSAGES_COLLECTION]
+    await builder_messages.create_index([("message_id", 1)], name="ux_builder_messages_message_id", unique=True)
+    await builder_messages.create_index([("thread_id", 1), ("created_at", 1)], name="idx_builder_messages_thread_created_at_asc")
+    await builder_messages.create_index([("workspace_id", 1), ("created_at", DESCENDING)], name="idx_builder_messages_workspace_created_at_desc")
 
 
 def ensure_artifacts_directory() -> Path:
