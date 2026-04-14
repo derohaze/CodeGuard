@@ -12,10 +12,10 @@ describe("formatRelativeTime", () => {
   });
 
   it("treats naive ISO timestamps from the backend as UTC", () => {
-    expect(formatRelativeTime("2026-04-14T18:54:40.000")).toBe("now");
+    expect(formatRelativeTime("2026-04-14T18:54:40.000")).toMatch(/^\d{2}:\d{2}(?:\s?[AP]M)?$/u);
   });
 
-  it("clamps future timestamps to now instead of showing negative drift", () => {
-    expect(formatRelativeTime("2026-04-14T18:56:10.000Z")).toBe("now");
+  it("formats older timestamps as calendar dates instead of relative labels", () => {
+    expect(formatRelativeTime("2026-04-12T18:56:10.000Z")).toBe("Apr 12");
   });
 });

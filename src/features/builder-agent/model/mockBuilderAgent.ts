@@ -7,6 +7,7 @@ export interface BuilderThread {
   id: string;
   title: string;
   updatedAt: string;
+  rawUpdatedAt?: string;
 }
 
 export interface BuilderThreadGroup {

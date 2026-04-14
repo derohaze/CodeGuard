@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { AlertCircle, Clock3, Ellipsis, GitPullRequest, Trash2, TriangleAlert } from "lucide-react";
 import {
   DropdownMenu,
@@ -47,7 +46,7 @@ export function SidebarSessionItem({ session, index, isActive = false, onClick, 
   return (
     <HoverCard open={isHovered} openDelay={0} closeDelay={0}>
       <HoverCardTrigger asChild>
-        <motion.div
+        <div
           onClick={onClick}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
@@ -60,9 +59,6 @@ export function SidebarSessionItem({ session, index, isActive = false, onClick, 
           role="button"
           tabIndex={0}
           aria-pressed={isActive}
-          initial={{ opacity: 0, x: -12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 + index * 0.04, duration: 0.25 }}
           className={`group relative w-full rounded-xl px-3 py-2.5 text-left transition-colors ${isActive ? "bg-muted" : "hover:bg-muted"}`}
         >
           <div className="flex items-start justify-between gap-2">
@@ -98,14 +94,6 @@ export function SidebarSessionItem({ session, index, isActive = false, onClick, 
               <span className={`inline-flex items-center gap-1 text-[10px] ${statusConfig.className}`}>
                 {statusConfig.icon === "loader" ? <Loader variant="spin" className="size-3 text-status-progress" /> : <statusConfig.icon size={12} strokeWidth={1.8} />}
               </span>
-              {session.unread && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.4 + index * 0.05, type: "spring", stiffness: 300 }}
-                  className="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent"
-                />
-              )}
             </div>
           </div>
 
@@ -120,7 +108,7 @@ export function SidebarSessionItem({ session, index, isActive = false, onClick, 
               {lifecycleSummary.label}
             </p>
           )}
-        </motion.div>
+        </div>
       </HoverCardTrigger>
 
       <HoverCardContent side="right" align="start" sideOffset={12} avoidCollisions={false} className="pointer-events-none z-30 w-[270px] rounded-[18px] border border-border-soft bg-surface p-4 shadow-[0_18px_40px_rgba(52,42,28,0.12)]">

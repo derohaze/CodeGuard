@@ -33,7 +33,26 @@ from app.infrastructure.database.collections import (
     SCAN_SESSIONS_COLLECTION,
     VERIFICATION_RUNS_COLLECTION,
 )
-from app.infrastructure.database.mongo import get_database
+from app.infrastructure.database.mongo import get_database, get_legacy_database_names
+
+
+SECURITY_MIGRATION_COLLECTIONS = (
+    SCAN_SESSIONS_COLLECTION,
+    SCAN_JOBS_COLLECTION,
+    FINDINGS_COLLECTION,
+    FIX_SUGGESTIONS_COLLECTION,
+    VERIFICATION_RUNS_COLLECTION,
+    AUDIT_EVENTS_COLLECTION,
+    REPORT_EXPORTS_COLLECTION,
+)
+
+BUILDER_MIGRATION_COLLECTIONS = (
+    BUILDER_WORKSPACES_COLLECTION,
+    BUILDER_THREADS_COLLECTION,
+    BUILDER_MESSAGES_COLLECTION,
+    BUILDER_THREAD_CONTEXTS_COLLECTION,
+    BUILDER_MEMORY_ITEMS_COLLECTION,
+)
 
 
 async def ensure_mongo_collections() -> None:
@@ -42,6 +61,62 @@ async def ensure_mongo_collections() -> None:
     for collection_name in REQUIRED_COLLECTIONS:
         if collection_name not in existing:
             await database.create_collection(collection_name)
+
+
+async def migrate_legacy_collections_if_needed() -> None:
+    current_database = get_database()
+    for legacy_database_name in get_legacy_database_names():
+        legacy_database = get_database(legacy_database_name)
+        await _migrate_collection_group_if_needed(
+            current_database=current_database,
+            legacy_database=legacy_database,
+            root_collection=SCAN_SESSIONS_COLLECTION,
+            related_collections=SECURITY_MIGRATION_COLLECTIONS,
+        )
+        await _migrate_collection_group_if_needed(
+            current_database=current_database,
+            legacy_database=legacy_database,
+            root_collection=BUILDER_WORKSPACES_COLLECTION,
+            related_collections=BUILDER_MIGRATION_COLLECTIONS,
+        )
+
+
+async def _migrate_collection_group_if_needed(
+    *,
+    current_database,
+    legacy_database,
+    root_collection: str,
+    related_collections: tuple[str, ...],
+) -> None:
+    current_root = current_database[root_collection]
+    legacy_root = legacy_database[root_collection]
+    current_count = await current_root.count_documents({})
+    if current_count > 0:
+        return
+
+    legacy_count = await legacy_root.count_documents({})
+    if legacy_count == 0:
+        return
+
+    for collection_name in related_collections:
+        current_collection = current_database[collection_name]
+        if await current_collection.count_documents({}) > 0:
+            continue
+        await _copy_collection_documents(
+            source_collection=legacy_database[collection_name],
+            target_collection=current_collection,
+        )
+
+
+async def _copy_collection_documents(*, source_collection, target_collection, batch_size: int = 250) -> None:
+    batch: list[dict] = []
+    async for document in source_collection.find({}):
+        batch.append(dict(document))
+        if len(batch) >= batch_size:
+            await target_collection.insert_many(batch, ordered=False)
+            batch = []
+    if batch:
+        await target_collection.insert_many(batch, ordered=False)
 
 
 async def ensure_mongo_indexes() -> None:
@@ -248,5 +323,6 @@ def ensure_artifacts_directory() -> Path:
 
 async def ensure_backend_bootstrap() -> None:
     await ensure_mongo_collections()
+    await migrate_legacy_collections_if_needed()
     await ensure_mongo_indexes()
     ensure_artifacts_directory()

@@ -53,7 +53,7 @@ export function AnimatedThreadTitle({ title }: { title: string }) {
   }, [title]);
 
   return (
-    <span className="min-w-0 truncate text-[15px] text-txt-primary" dir="auto" style={{ unicodeBidi: "plaintext" }}>
+    <span className="min-w-0 truncate text-[12px] font-medium text-txt-primary" dir="auto" style={{ unicodeBidi: "plaintext" }}>
       {visibleTitle}
     </span>
   );

@@ -4,18 +4,36 @@ import type { BuilderMessage, BuilderThreadGroup } from "../mockBuilderAgent";
 export function formatRelativeTime(isoValue: string): string {
   const parsed = parseBuilderTimestamp(isoValue);
   if (Number.isNaN(parsed.getTime())) {
-    return "now";
+    return "--:--";
   }
-  const diffMs = Math.max(0, Date.now() - parsed.getTime());
-  if (diffMs <= 60_000) return "now";
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d`;
-  const months = Math.floor(days / 30);
-  return `${Math.max(months, 1)}mo`;
+
+  const now = new Date();
+  const isSameDay =
+    parsed.getFullYear() === now.getFullYear()
+    && parsed.getMonth() === now.getMonth()
+    && parsed.getDate() === now.getDate();
+
+  if (isSameDay) {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  const isSameYear = parsed.getFullYear() === now.getFullYear();
+  return new Intl.DateTimeFormat(
+    "en-US",
+    isSameYear
+      ? {
+          month: "short",
+          day: "numeric",
+        }
+      : {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        },
+  ).format(parsed);
 }
 
 function parseBuilderTimestamp(value: string): Date {
@@ -45,6 +63,7 @@ export function mapWorkspace(workspace: BuilderWorkspaceDto): BuilderThreadGroup
     threads: workspace.threads.map((thread) => ({
       id: thread.id,
       title: thread.title,
+      rawUpdatedAt: thread.updatedAt,
       updatedAt: formatRelativeTime(thread.updatedAt),
     })),
   };

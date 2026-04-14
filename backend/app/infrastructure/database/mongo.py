@@ -11,6 +11,7 @@ _mongo_database = None
 _mongo_lock = asyncio.Lock()
 _mongo_uri_in_use: str | None = None
 logger = logging.getLogger(__name__)
+LEGACY_DATABASE_NAMES = ("CodeGuard",)
 
 
 def _build_client(uri: str | None = None) -> AsyncMongoClient:
@@ -61,10 +62,10 @@ async def initialize_mongo():
         raise RuntimeError("Failed to initialize MongoDB connection.") from errors[-1][1]
 
 
-def get_database():
+def get_database(database_name: str | None = None):
     global _mongo_client, _mongo_database, _mongo_uri_in_use
+    settings = get_settings()
     if _mongo_database is None:
-        settings = get_settings()
         last_error: Exception | None = None
         for uri in _candidate_uris():
             try:
@@ -76,7 +77,18 @@ def get_database():
                 last_error = exc
         if _mongo_database is None and last_error is not None:
             raise RuntimeError("MongoDB client is not available for the configured URIs.") from last_error
+    if database_name and database_name != settings.mongodb_database:
+        return _mongo_client[database_name]
     return _mongo_database
+
+
+def get_legacy_database_names() -> list[str]:
+    current_name = get_settings().mongodb_database
+    return [name for name in LEGACY_DATABASE_NAMES if name and name != current_name]
+
+
+def get_legacy_databases() -> list:
+    return [get_database(database_name) for database_name in get_legacy_database_names()]
 
 
 async def ping_mongo() -> bool:

@@ -8,7 +8,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.infrastructure.database.mongo_manager import ensure_backend_bootstrap, ensure_mongo_indexes
+from app.infrastructure.database.mongo_manager import ensure_backend_bootstrap, ensure_mongo_indexes, migrate_legacy_collections_if_needed
 
 
 class MongoManagerTests(unittest.TestCase):
@@ -159,6 +159,9 @@ class MongoManagerTests(unittest.TestCase):
             collections[name] = collection
         database.__getitem__.side_effect = collections.__getitem__
         with patch("app.infrastructure.database.mongo_manager.get_database", return_value=database), patch(
+            "app.infrastructure.database.mongo_manager.get_legacy_database_names",
+            return_value=[],
+        ), patch(
             "app.infrastructure.database.mongo_manager.ensure_artifacts_directory"
         ):
             asyncio.run(ensure_backend_bootstrap())
@@ -166,6 +169,78 @@ class MongoManagerTests(unittest.TestCase):
         created = [call.args[0] for call in database.create_collection.call_args_list]
         self.assertIn("scan_jobs", created)
         self.assertIn("audit_events", created)
+
+    def test_migrate_legacy_collections_copies_security_and_builder_data_when_current_is_empty(self):
+        copied_collection_names: list[str] = []
+
+        current_scan_sessions = MagicMock()
+        current_scan_sessions.count_documents = AsyncMock(return_value=0)
+        current_scan_sessions.insert_many = AsyncMock(side_effect=lambda docs, ordered=False: copied_collection_names.append("scan_sessions"))
+        current_builder_workspaces = MagicMock()
+        current_builder_workspaces.count_documents = AsyncMock(return_value=0)
+        current_builder_workspaces.insert_many = AsyncMock(side_effect=lambda docs, ordered=False: copied_collection_names.append("builder_workspaces"))
+
+        def current_collection(name: str):
+            collection = MagicMock()
+            if name == "scan_sessions":
+                return current_scan_sessions
+            if name == "builder_workspaces":
+                return current_builder_workspaces
+            collection.count_documents = AsyncMock(return_value=0)
+            collection.insert_many = AsyncMock(side_effect=lambda docs, ordered=False, _name=name: copied_collection_names.append(_name))
+            return collection
+
+        legacy_scan_sessions = MagicMock()
+        legacy_scan_sessions.count_documents = AsyncMock(return_value=2)
+        legacy_scan_sessions.find.return_value = _AsyncCursor([{"_id": "s1"}, {"_id": "s2"}])
+        legacy_builder_workspaces = MagicMock()
+        legacy_builder_workspaces.count_documents = AsyncMock(return_value=1)
+        legacy_builder_workspaces.find.return_value = _AsyncCursor([{"_id": "w1"}])
+
+        def legacy_collection(name: str):
+            collection = MagicMock()
+            if name == "scan_sessions":
+                return legacy_scan_sessions
+            if name == "builder_workspaces":
+                return legacy_builder_workspaces
+            collection.find.return_value = _AsyncCursor([{"_id": f"{name}-1"}])
+            return collection
+
+        current_database = MagicMock()
+        current_database.__getitem__.side_effect = current_collection
+        legacy_database = MagicMock()
+        legacy_database.__getitem__.side_effect = legacy_collection
+
+        def get_database(database_name=None):
+            return legacy_database if database_name == "CodeGuard" else current_database
+
+        with patch("app.infrastructure.database.mongo_manager.get_database", side_effect=get_database), patch(
+            "app.infrastructure.database.mongo_manager.get_legacy_database_names",
+            return_value=["CodeGuard"],
+        ):
+            asyncio.run(migrate_legacy_collections_if_needed())
+
+        self.assertIn("scan_jobs", copied_collection_names)
+        self.assertIn("findings", copied_collection_names)
+        self.assertIn("builder_threads", copied_collection_names)
+        self.assertIn("builder_messages", copied_collection_names)
+
+
+class _AsyncCursor:
+    def __init__(self, items):
+        self._items = items
+        self._index = 0
+
+    def __aiter__(self):
+        self._index = 0
+        return self
+
+    async def __anext__(self):
+        if self._index >= len(self._items):
+            raise StopAsyncIteration
+        item = self._items[self._index]
+        self._index += 1
+        return item
 
 
 if __name__ == "__main__":

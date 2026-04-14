@@ -77,6 +77,12 @@ class MongoFallbackTests(unittest.TestCase):
 
         self.assertIs(database, fallback_client.__getitem__.return_value)
 
+    def test_get_legacy_database_names_excludes_current_database(self):
+        with patch("app.infrastructure.database.mongo.get_settings", return_value=_settings()):
+            legacy_names = mongo_module.get_legacy_database_names()
+
+        self.assertEqual(legacy_names, ["CodeGuard"])
+
 
 if __name__ == "__main__":
     unittest.main()

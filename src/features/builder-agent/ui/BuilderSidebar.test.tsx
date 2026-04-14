@@ -17,6 +17,9 @@ vi.mock("framer-motion", () => ({
     div: ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, layout: _layout, whileDrag: _whileDrag, ...props }: { children?: ReactNode } & Record<string, unknown>) => (
       <div {...props}>{children}</div>
     ),
+    span: ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, ...props }: { children?: ReactNode } & Record<string, unknown>) => (
+      <span {...props}>{children}</span>
+    ),
     button: ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, ...props }: { children?: ReactNode } & Record<string, unknown>) => (
       <button {...props}>{children}</button>
     ),
@@ -110,7 +113,7 @@ describe("BuilderSidebar", () => {
     expect(screen.queryByText("Mind Misery")).not.toBeInTheDocument();
 
     act(() => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
 
     expect(screen.getByText("Mind Misery")).toBeInTheDocument();

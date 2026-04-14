@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, Reorder } from "framer-motion";
+import { AnimatePresence, Reorder, motion } from "framer-motion";
 import {
   Check,
   ChevronDown,
@@ -118,14 +118,23 @@ export function BuilderSidebar({
     : { label: "Collapse all", onClick: onCollapseAllWorkspaces, icon: <CollapseAllIcon /> };
 
   const filteredThreadGroups = useMemo(() => {
-    const isRelevant = (updatedAt: string) => !updatedAt.endsWith("mo");
+    const isRelevant = (updatedAt: string, rawUpdatedAt?: string) => {
+      const parsedTimestamp = resolveThreadSortTimestamp(updatedAt, rawUpdatedAt);
+      if (parsedTimestamp === Number.NEGATIVE_INFINITY) {
+        return true;
+      }
+
+      const now = Date.now();
+      const thirtyDaysInMilliseconds = 30 * 24 * 60 * 60 * 1000;
+      return now - parsedTimestamp < thirtyDaysInMilliseconds;
+    };
 
     const groups = threadGroups
       .map((group) => {
         let threads = [...group.threads];
 
         if (showMode === "relevant") {
-          threads = threads.filter((thread) => isRelevant(thread.updatedAt));
+          threads = threads.filter((thread) => isRelevant(thread.updatedAt, thread.rawUpdatedAt));
         }
 
         if (sortBy === "created") {
@@ -133,7 +142,9 @@ export function BuilderSidebar({
         }
 
         if (sortBy === "updated") {
-          threads = [...threads].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+          threads = [...threads].sort(
+            (a, b) => resolveThreadSortTimestamp(b.updatedAt, b.rawUpdatedAt) - resolveThreadSortTimestamp(a.updatedAt, a.rawUpdatedAt),
+          );
         }
 
         return { ...group, threads };
@@ -142,9 +153,10 @@ export function BuilderSidebar({
 
     if (organizeMode === "time") {
       return [...groups].sort((a, b) => {
-        const left = a.threads[0]?.updatedAt ?? "";
-        const right = b.threads[0]?.updatedAt ?? "";
-        return left.localeCompare(right);
+        const left = a.threads[0];
+        const right = b.threads[0];
+        return resolveThreadSortTimestamp(right?.updatedAt ?? "", right?.rawUpdatedAt)
+          - resolveThreadSortTimestamp(left?.updatedAt ?? "", left?.rawUpdatedAt);
       });
     }
 
@@ -160,43 +172,49 @@ export function BuilderSidebar({
     .filter((group): group is BuilderThreadGroup => group !== null);
 
   return (
-    <aside
-      className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar"
-      style={{
-        borderColor: "hsl(var(--border-primary))",
-        width: isCollapsed ? 0 : 300,
-        opacity: isCollapsed ? 0 : 1,
-      }}
+    <div
+      className="relative h-full shrink-0 overflow-hidden"
+      style={{ width: isCollapsed ? 0 : 300 }}
       aria-hidden={isCollapsed}
     >
-      <div className="px-5 pb-2 pt-5">
-        <div className="relative">
-          <div className="space-y-3 pr-8">
-            <BrandModeHeading mode={workspaceMode} />
-            <WorkspaceModeSwitch mode={workspaceMode} onChange={onWorkspaceModeChange} />
+      <motion.aside
+        className="absolute inset-y-0 left-0 flex w-[300px] min-h-0 flex-col overflow-hidden border-r bg-surface-sidebar"
+        style={{ borderColor: "hsl(var(--border-primary))" }}
+        initial={false}
+        animate={{
+          x: isCollapsed ? -300 : 0,
+          opacity: isCollapsed ? 0 : 1,
+        }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div className="px-5 pb-2 pt-5">
+          <div className="relative">
+            <div className="space-y-3 pr-8">
+              <BrandModeHeading mode={workspaceMode} />
+              <WorkspaceModeSwitch mode={workspaceMode} onChange={onWorkspaceModeChange} />
+            </div>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleCollapse}
+                  className="absolute right-0 top-0 p-1 text-txt-secondary transition-colors hover:text-txt-primary"
+                  aria-label="Hide sidebar"
+                >
+                  <PanelLeftClose size={17} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="end" sideOffset={8} className="rounded-xl border border-border-soft bg-surface px-3 py-1.5 text-xs text-txt-primary shadow-md">
+                Hide sidebar
+              </TooltipContent>
+            </Tooltip>
           </div>
-          <Tooltip delayDuration={0}>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onToggleCollapse}
-                className="absolute right-0 top-0 p-1 text-txt-secondary transition-colors hover:text-txt-primary"
-                aria-label="Hide sidebar"
-              >
-                <PanelLeftClose size={17} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="end" sideOffset={8} className="rounded-xl border border-border-soft bg-surface px-3 py-1.5 text-xs text-txt-primary shadow-md">
-              Hide sidebar
-            </TooltipContent>
-          </Tooltip>
         </div>
-      </div>
 
-      <BuilderSidebarSearchButton onOpen={() => setIsCommandMenuOpen(true)} />
+        <BuilderSidebarSearchButton onOpen={() => setIsCommandMenuOpen(true)} />
 
-      <div className="flex items-center justify-between px-5 pb-2 pt-5">
-        <span className="text-xs font-medium text-txt-tertiary">Threads</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-5 pb-2 pt-5">
+          <span className="text-xs font-medium text-txt-tertiary">Threads</span>
+          <div className="flex items-center gap-1">
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <button type="button" onClick={primaryThreadsAction.onClick} className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[#8a8276] transition-colors hover:bg-muted hover:text-txt-primary" aria-label={primaryThreadsAction.label}>
@@ -278,10 +296,10 @@ export function BuilderSidebar({
               Add new project
             </TooltipContent>
           </Tooltip>
+          </div>
         </div>
-      </div>
 
-      <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <Reorder.Group axis="y" values={orderedWorkspaceIds} onReorder={(nextOrder) => {
           setOrderedWorkspaceIds(nextOrder);
           onReorderWorkspaces(nextOrder);
@@ -431,20 +449,46 @@ export function BuilderSidebar({
             );
           })}
         </Reorder.Group>
-      </div>
+        </div>
 
-      <SidebarFooter onOpenSettings={onOpenSettings} />
-      <BuilderCommandMenu
-        currentWorkspaceId={currentWorkspaceId}
-        isOpen={isCommandMenuOpen}
-        onAddWorkspace={onAddWorkspace}
-        onClose={() => setIsCommandMenuOpen(false)}
-        onCreateWorkspaceThread={onCreateWorkspaceThread}
-        onOpenConversation={onOpenConversation}
-        onOpenSettings={onOpenSettings}
-        onToggleCollapse={onToggleCollapse}
-        threadGroups={threadGroups}
-      />
-    </aside>
+        <SidebarFooter onOpenSettings={onOpenSettings} />
+        <BuilderCommandMenu
+          currentWorkspaceId={currentWorkspaceId}
+          isOpen={isCommandMenuOpen}
+          onAddWorkspace={onAddWorkspace}
+          onClose={() => setIsCommandMenuOpen(false)}
+          onCreateWorkspaceThread={onCreateWorkspaceThread}
+          onOpenConversation={onOpenConversation}
+          onOpenSettings={onOpenSettings}
+          onToggleCollapse={onToggleCollapse}
+          threadGroups={threadGroups}
+        />
+      </motion.aside>
+    </div>
   );
+}
+
+function resolveThreadSortTimestamp(updatedAt: string, rawUpdatedAt?: string): number {
+  if (rawUpdatedAt) {
+    const parsed = Date.parse(rawUpdatedAt);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  const relativeMatch = updatedAt.trim().match(/^(\d+)(m|h|d|mo)$/u);
+  if (!relativeMatch) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const [, amountText, unit] = relativeMatch;
+  const amount = Number(amountText);
+  const unitInMilliseconds = unit === "m"
+    ? 60 * 1000
+    : unit === "h"
+      ? 60 * 60 * 1000
+      : unit === "d"
+        ? 24 * 60 * 60 * 1000
+        : 30 * 24 * 60 * 60 * 1000;
+  return Date.now() - (amount * unitInMilliseconds);
 }
