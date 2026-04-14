@@ -573,7 +573,7 @@ export function BuilderSidebar({
                       onMouseEnter={() => setHoveredWorkspaceThreadsId(group.id)}
                       onMouseLeave={() => setHoveredWorkspaceThreadsId((current) => (current === group.id ? null : current))}
                     >
-                      <div className="space-y-0.5">
+                      <div className="space-y-1.5">
                         {visibleThreads.map((thread) => {
                           const active = activeConversationId === thread.id;
                           const showThreadControls = active || hoveredWorkspaceThreadsId === group.id;
