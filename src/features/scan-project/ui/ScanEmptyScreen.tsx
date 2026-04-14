@@ -36,7 +36,7 @@ export function ScanEmptyScreen({ onStartScan }: Props) {
 
       <h2 className="mb-2 text-xl font-semibold text-txt-primary">Analyze your code for security issues</h2>
       <p className="mb-8 max-w-md text-center text-sm leading-relaxed text-txt-secondary">
-        Choose a real file or folder, then let CodeGuard run the connected backend analyst flow.
+        Choose a real file or folder, then let Khwarizm run the connected backend analyst flow.
       </p>
 
       <motion.button

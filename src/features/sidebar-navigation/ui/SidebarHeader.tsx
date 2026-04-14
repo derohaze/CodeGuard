@@ -18,7 +18,7 @@ export function SidebarHeader({
         <div className="space-y-3">
           <div className="flex items-center gap-2.5">
             <h1 className="font-brand text-[22px] font-normal tracking-[-0.01em] text-txt-primary">
-              CodeGuard
+              Khwarizm
             </h1>
           </div>
           <WorkspaceModeSwitch mode={mode} onChange={onModeChange} />

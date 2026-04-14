@@ -44,7 +44,7 @@ export function BuilderConversationMenu({
     }
   };
 
-  const deeplink = activeConversationId ? `codeguard://builder/${activeConversationId}` : null;
+  const deeplink = activeConversationId ? `khwarizm://builder/${activeConversationId}` : null;
 
   return (
     <DropdownMenu>

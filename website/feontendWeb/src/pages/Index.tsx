@@ -52,7 +52,7 @@ export default function Index() {
               Fix them with <span className="serif-accent">confidence</span>.
             </>
           }
-          subtitle="CodeGuard is a focused desktop application for code security scanning, vulnerability analysis, and guided remediation. From scan to patch review — one workspace, zero friction."
+          subtitle="Khwarizm is a focused desktop application for code security scanning, vulnerability analysis, and guided remediation. From scan to patch review â€” one workspace, zero friction."
         >
           <Link to="/download">
             <Button size="lg" className="gap-2">
@@ -75,7 +75,7 @@ export default function Index() {
         <SectionHeader
           overline="Core Capabilities"
           title="Everything you need for secure code review"
-          subtitle="A complete toolkit for scanning, understanding, fixing, and tracking security issues — all from your desktop."
+          subtitle="A complete toolkit for scanning, understanding, fixing, and tracking security issues â€” all from your desktop."
           center
         />
         <CapabilitiesGrid />
@@ -83,9 +83,9 @@ export default function Index() {
 
       {/* Product Story */}
       <SpotlightSection
-        overline="Why CodeGuard"
+        overline="Why Khwarizm"
         title="Turn fragmented security work into a structured workflow"
-        description="Most teams juggle multiple tools, tabs, and processes to handle code security. CodeGuard brings scanning, analysis, fix generation, patch review, and session management into a single professional desktop environment — designed for the way security engineers actually work."
+        description="Most teams juggle multiple tools, tabs, and processes to handle code security. Khwarizm brings scanning, analysis, fix generation, patch review, and session management into a single professional desktop environment â€” designed for the way security engineers actually work."
         visual={<ProductMockup />}
       />
 
@@ -94,12 +94,12 @@ export default function Index() {
         reversed
         overline="Vulnerability Scanning"
         title="Intelligent detection that understands your code"
-        description="CodeGuard analyzes your source code to surface real vulnerabilities — not just pattern matches. Every finding includes severity classification, file location, and contextual explanation so you can assess risk immediately."
+        description="Khwarizm analyzes your source code to surface real vulnerabilities â€” not just pattern matches. Every finding includes severity classification, file location, and contextual explanation so you can assess risk immediately."
         visual={
           <div className="rounded-xl border border-border bg-card p-5 shadow-lg">
             <div className="space-y-3">
               {[
-                { title: "SQL Injection — query builder", sev: "critical" as const },
+                { title: "SQL Injection â€” query builder", sev: "critical" as const },
                 { title: "Hardcoded API key in config", sev: "high" as const },
                 { title: "Weak PRNG for token generation", sev: "high" as const },
               ].map((f) => (
@@ -117,7 +117,7 @@ export default function Index() {
       <SpotlightSection
         overline="Fix Suggestions"
         title="From finding to fix in seconds"
-        description="Every vulnerability comes with a suggested remediation. CodeGuard generates code-level fixes you can review, refine, and apply — reducing the time between detection and resolution."
+        description="Every vulnerability comes with a suggested remediation. Khwarizm generates code-level fixes you can review, refine, and apply â€” reducing the time between detection and resolution."
         visual={<DiffMockup />}
       />
 
@@ -125,7 +125,7 @@ export default function Index() {
         reversed
         overline="Builder Agent"
         title="Guided remediation, step by step"
-        description="The Builder Agent walks you through complex fixes with contextual guidance. It explains the vulnerability, suggests the right approach, and helps you implement the fix with confidence — all within your workspace."
+        description="The Builder Agent walks you through complex fixes with contextual guidance. It explains the vulnerability, suggests the right approach, and helps you implement the fix with confidence â€” all within your workspace."
         visual={<AgentMockup />}
       />
 

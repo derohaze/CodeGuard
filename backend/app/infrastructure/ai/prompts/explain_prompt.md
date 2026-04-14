@@ -21,7 +21,7 @@ Required checks:
 - describe how attacker-controlled data flows between them
 - produce one realistic request example and one payload example when possible
 - tie examples to actual route names, field names, headers, variables, or resolver args visible in the context
-- if uncertainty remains, keep examples compact and use safe placeholders such as `attacker.example` or `CODEGUARD_TEST`
+- if uncertainty remains, keep examples compact and use safe placeholders such as `attacker.example` or `KHWARIZM_TEST`
 - separate direct evidence from inferred attack steps
 
 Output schema JSON:

@@ -1,4 +1,4 @@
-Shared security scan rules for CodeGuard:
+Shared security scan rules for Khwarizm:
 
 - Stay evidence-grounded. Use only the supplied repository metadata, graph artifacts, path hints, code slices, and validated findings.
 - Never invent files, routes, imports, services, request fields, variables, sanitizers, or sinks that are not present in the provided input.

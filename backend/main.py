@@ -35,7 +35,7 @@ def _start_embedded_worker() -> BaseProcess | None:
     if not _should_start_embedded_worker():
         return None
     context = multiprocessing.get_context("spawn")
-    worker_process = context.Process(target=_run_embedded_worker, name="codeguard-arq-worker", daemon=True)
+    worker_process = context.Process(target=_run_embedded_worker, name="khwarizm-arq-worker", daemon=True)
     worker_process.start()
     return worker_process
 

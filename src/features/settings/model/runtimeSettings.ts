@@ -6,7 +6,7 @@ import {
   type UpdateRuntimeSettingsPayload,
 } from "@/shared/api/security";
 
-export const SIDEBAR_COLLAPSED_STORAGE_KEY = "codeguard.sidebar.collapsed";
+export const SIDEBAR_COLLAPSED_STORAGE_KEY = "khwarizm.sidebar.collapsed";
 
 export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   defaultPreset: "balanced",

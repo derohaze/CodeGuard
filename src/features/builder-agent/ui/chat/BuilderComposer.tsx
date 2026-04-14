@@ -129,7 +129,7 @@ export function BuilderComposer({
   const permissionDialogCopy = {
     title: "Enable full access?",
     body:
-      "When CodeGuard runs with full access, it can edit files across your computer and run commands with network access without asking first.\n\nUse this only if you trust the current project. Full access increases the risk of unwanted edits, leaks, or data loss.",
+      "When Khwarizm runs with full access, it can edit files across your computer and run commands with network access without asking first.\n\nUse this only if you trust the current project. Full access increases the risk of unwanted edits, leaks, or data loss.",
     confirm: "Yes, continue anyway",
   };
 
@@ -172,7 +172,7 @@ export function BuilderComposer({
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
               onKeyDown={handleComposerKeyDown}
-              placeholder="Ask CodeGuard Builder anything..."
+              placeholder="Ask Khwarizm Builder anything..."
               rows={1}
               className="min-h-[22px] max-h-[152px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-[14px] leading-6 text-txt-primary shadow-none outline-none ring-0 placeholder:text-txt-secondary focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             />

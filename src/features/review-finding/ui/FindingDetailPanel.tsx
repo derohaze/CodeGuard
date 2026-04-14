@@ -59,7 +59,7 @@ export function FindingDetailPanel({ finding, sessionId, onDismiss, onOpenDecisi
       });
       setExplanation(detail);
     } catch (error) {
-      console.error("[CodeGuard] Failed to explain finding", error);
+      console.error("[Khwarizm] Failed to explain finding", error);
       toast.error(error instanceof Error ? error.message : "Unable to explain this finding.");
     } finally {
       setIsExplanationLoading(false);
@@ -268,7 +268,7 @@ export function FindingDetailPanel({ finding, sessionId, onDismiss, onOpenDecisi
 
               <Panel>
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-txt-primary">Why CodeGuard recommends a fix</p>
+                  <p className="text-sm font-semibold text-txt-primary">Why Khwarizm recommends a fix</p>
                   <span className="text-xs text-txt-tertiary">Security-specific guidance</span>
                 </div>
                 <div className="space-y-3">
@@ -304,7 +304,7 @@ export function FindingDetailPanel({ finding, sessionId, onDismiss, onOpenDecisi
 
               <Panel>
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-txt-primary">How CodeGuard explains it</p>
+                  <p className="text-sm font-semibold text-txt-primary">How Khwarizm explains it</p>
                   <span className="text-xs text-txt-tertiary">Cause to effect</span>
                 </div>
                 <div className="space-y-3">

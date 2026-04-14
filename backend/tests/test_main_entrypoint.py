@@ -9,10 +9,10 @@ ENTRYPOINT_PATH = BACKEND_ROOT / "main.py"
 
 
 def _load_entrypoint_module():
-    spec = importlib.util.spec_from_file_location("codeguard_backend_entrypoint", ENTRYPOINT_PATH)
+    spec = importlib.util.spec_from_file_location("khwarizm_backend_entrypoint", ENTRYPOINT_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
-    sys.modules["codeguard_backend_entrypoint"] = module
+    sys.modules["khwarizm_backend_entrypoint"] = module
     spec.loader.exec_module(module)
     return module
 

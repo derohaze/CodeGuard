@@ -32,7 +32,7 @@ class ScanJobDispatcherTests(unittest.TestCase):
 
     def test_arq_dispatcher_enqueues_job_on_named_queue(self):
         pool = FakeArqPool()
-        dispatcher = ArqScanJobDispatcher("codeguard:queue:scan")
+        dispatcher = ArqScanJobDispatcher("khwarizm:queue:scan")
 
         with patch("app.infrastructure.queue.scan_job_dispatcher.get_arq_pool", AsyncMock(return_value=pool)):
             asyncio.run(dispatcher.enqueue_scan("session-1", "job-1"))
@@ -41,7 +41,7 @@ class ScanJobDispatcherTests(unittest.TestCase):
             "run_scan_job",
             "session-1",
             "job-1",
-            _queue_name="codeguard:queue:scan",
+            _queue_name="khwarizm:queue:scan",
             _job_id="scan:job-1",
         )
 

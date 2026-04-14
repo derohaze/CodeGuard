@@ -15,7 +15,7 @@ export function SidebarFooter({ onOpenSettings }: { onOpenSettings: () => void }
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-txt-primary">Sarah Chen</p>
-        <p className="truncate text-xs text-txt-tertiary">sarah.chen@codeguard.app</p>
+        <p className="truncate text-xs text-txt-tertiary">sarah.chen@khwarizm.app</p>
       </div>
       <Popover open={isSettingsMenuOpen} onOpenChange={setIsSettingsMenuOpen}>
         <PopoverTrigger asChild>
@@ -42,7 +42,7 @@ export function SidebarFooter({ onOpenSettings }: { onOpenSettings: () => void }
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-txt-primary">Sarah Chen</p>
-                <p className="truncate text-xs text-txt-tertiary">sarah.chen@codeguard.app</p>
+                <p className="truncate text-xs text-txt-tertiary">sarah.chen@khwarizm.app</p>
               </div>
             </div>
 

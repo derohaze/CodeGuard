@@ -103,7 +103,7 @@ class ScanFailureHandlingTests(unittest.TestCase):
             self.assertFalse(repository.session.is_safe)
             self.assertEqual(
                 repository.session.error_message,
-                "CodeGuard could not complete the scan because the configured AI runtime was temporarily unavailable. Retry shortly.",
+                "Khwarizm could not complete the scan because the configured AI runtime was temporarily unavailable. Retry shortly.",
             )
             self.assertEqual(repository.session.score_rationale["status"], "failed")
 

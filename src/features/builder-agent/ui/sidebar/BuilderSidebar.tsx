@@ -174,7 +174,7 @@ export function BuilderSidebar({
       <div className="px-5 pb-2 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-3">
-            <h1 className="font-brand text-[22px] font-normal tracking-[-0.01em] text-txt-primary">CodeGuard</h1>
+            <h1 className="font-brand text-[22px] font-normal tracking-[-0.01em] text-txt-primary">Khwarizm</h1>
             <WorkspaceModeSwitch mode={workspaceMode} onChange={onWorkspaceModeChange} />
           </div>
           <Tooltip delayDuration={0}>

@@ -21,7 +21,7 @@ class LearningRepositoryIntegrationTests(unittest.TestCase):
         asyncio.run(self._run_case(settings.mongodb_uri))
 
     async def _run_case(self, mongodb_uri: str) -> None:
-        db_name = f"codeguard_learning_it_{uuid4().hex[:10]}"
+        db_name = f"khwarizm_learning_it_{uuid4().hex[:10]}"
         client = AsyncMongoClient(
             mongodb_uri,
             serverSelectionTimeoutMS=3000,

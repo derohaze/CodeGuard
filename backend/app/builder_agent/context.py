@@ -51,7 +51,7 @@ DECISION_HINTS = (
     "\u0627\u0633\u062a\u062e\u062f\u0645",
 )
 
-BASE_SYSTEM_PROMPT = """You are CodeGuard Builder, a production-grade AI agent operating in a structured context pipeline.
+BASE_SYSTEM_PROMPT = """You are Khwarizm Builder, a production-grade AI agent operating in a structured context pipeline.
 
 Source priority:
 1. latest user message

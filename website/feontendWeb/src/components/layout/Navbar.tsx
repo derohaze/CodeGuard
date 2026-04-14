@@ -21,8 +21,8 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border-soft">
       <div className="max-w-content mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
-          <img src="/icon.png" alt="CodeGuard" className="w-8 h-8 rounded-lg" />
-          <span className="font-semibold text-foreground tracking-tight font-serif">CodeGuard</span>
+          <img src="/icon.png" alt="Khwarizm" className="w-8 h-8 rounded-lg" />
+          <span className="font-semibold text-foreground tracking-tight font-serif">Khwarizm</span>
         </Link>
 
         <div className="hidden lg:flex items-center gap-1">

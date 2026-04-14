@@ -37,8 +37,8 @@ class ScanLockManager:
             session_id=session_id,
             source_fingerprint=source_fingerprint,
             owner=owner,
-            session_key=f"codeguard:lock:scan:session:{session_id}",
-            source_key=f"codeguard:lock:scan:source:{source_fingerprint}",
+            session_key=f"khwarizm:lock:scan:session:{session_id}",
+            source_key=f"khwarizm:lock:scan:source:{source_fingerprint}",
             session_ttl_seconds=self.session_ttl_seconds,
             source_ttl_seconds=self.source_ttl_seconds,
         )
@@ -70,8 +70,8 @@ class ScanLockManager:
             session_id=session_id,
             source_fingerprint=source_fingerprint,
             owner=owner,
-            session_key=f"codeguard:lock:scan:session:{session_id}",
-            source_key=f"codeguard:lock:scan:source:{source_fingerprint}",
+            session_key=f"khwarizm:lock:scan:session:{session_id}",
+            source_key=f"khwarizm:lock:scan:source:{source_fingerprint}",
             session_ttl_seconds=self.session_ttl_seconds,
             source_ttl_seconds=self.source_ttl_seconds,
         )

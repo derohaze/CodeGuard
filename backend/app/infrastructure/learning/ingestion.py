@@ -25,7 +25,7 @@ from app.infrastructure.learning.schemas import ExternalKnowledgeSourceSpec
 from app.infrastructure.settings.runtime_settings_service import RuntimeSettingsService
 
 
-logger = logging.getLogger("codeguard.learning.ingestion")
+logger = logging.getLogger("khwarizm.learning.ingestion")
 
 
 @dataclass(slots=True)

@@ -40,7 +40,7 @@ async def start_scan(
         await start_scan_use_case.mark_dispatch_failed(
             created_session,
             created_job,
-            "CodeGuard could not queue the scan job. Check queue readiness and retry.",
+            "Khwarizm could not queue the scan job. Check queue readiness and retry.",
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

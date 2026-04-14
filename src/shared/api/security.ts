@@ -390,7 +390,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
     });
   } catch (error) {
-    console.error("[CodeGuard] Network request failed", {
+    console.error("[Khwarizm] Network request failed", {
       path,
       method: init?.method ?? "GET",
       error,
@@ -407,7 +407,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body = null;
     }
 
-    console.error("[CodeGuard] API request failed", {
+    console.error("[Khwarizm] API request failed", {
       path,
       method: init?.method ?? "GET",
       status: response.status,

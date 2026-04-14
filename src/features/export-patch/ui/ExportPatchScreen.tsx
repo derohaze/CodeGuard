@@ -51,7 +51,7 @@ export function ExportPatchScreen({
       await navigator.clipboard.writeText(value);
       toast.success(`${label} copied to the clipboard.`);
     } catch (error) {
-      console.error("[CodeGuard] Failed to copy export artifact", error);
+      console.error("[Khwarizm] Failed to copy export artifact", error);
       toast.error(`Unable to copy the ${label.toLowerCase()} on this device.`);
     }
   };
@@ -61,7 +61,7 @@ export function ExportPatchScreen({
       downloadTextFile(bundle.patchFileName, bundle.patchText);
       toast.success("Patch file downloaded.");
     } catch (error) {
-      console.error("[CodeGuard] Failed to download patch artifact", error);
+      console.error("[Khwarizm] Failed to download patch artifact", error);
       toast.error("Unable to download the patch file right now.");
     }
   };

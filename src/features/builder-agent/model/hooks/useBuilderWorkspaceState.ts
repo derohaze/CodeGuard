@@ -54,7 +54,7 @@ export function useBuilderWorkspaceState() {
 
   useEffect(() => {
     void refreshWorkspaces().catch((error) => {
-      console.error("[CodeGuard Builder] Failed to load workspaces", error);
+      console.error("[Khwarizm Builder] Failed to load workspaces", error);
       setThreadGroups([]);
     });
   }, [refreshWorkspaces]);
@@ -131,7 +131,7 @@ export function useBuilderWorkspaceState() {
       if (pendingConversationOpenRef.current === conversationId) {
         setActiveConversationId(conversationId);
       }
-      console.error("[CodeGuard Builder] Failed to open conversation", error);
+      console.error("[Khwarizm Builder] Failed to open conversation", error);
     } finally {
       if (pendingConversationOpenRef.current === conversationId) {
         pendingConversationOpenRef.current = null;
@@ -194,7 +194,7 @@ export function useBuilderWorkspaceState() {
         setExpandedWorkspaceIds((current) => (current.includes(workspace.id) ? current : [...current, workspace.id]));
         setActiveConversationId(null);
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to create workspace", error);
+        console.error("[Khwarizm Builder] Failed to create workspace", error);
       }
     })();
   }, [refreshWorkspaces]);
@@ -210,7 +210,7 @@ export function useBuilderWorkspaceState() {
         await renameBuilderWorkspace(workspaceId, nextLabel);
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to rename workspace", error);
+        console.error("[Khwarizm Builder] Failed to rename workspace", error);
       }
     })();
   }, [refreshWorkspaces, threadGroups]);
@@ -241,7 +241,7 @@ export function useBuilderWorkspaceState() {
         }
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to archive workspace threads", error);
+        console.error("[Khwarizm Builder] Failed to archive workspace threads", error);
       }
     })();
   }, [activeConversationId, refreshWorkspaces, threadGroups]);
@@ -272,7 +272,7 @@ export function useBuilderWorkspaceState() {
         }
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to remove workspace", error);
+        console.error("[Khwarizm Builder] Failed to remove workspace", error);
       }
     })();
   }, [activeConversationId, refreshWorkspaces, threadGroups]);
@@ -315,7 +315,7 @@ export function useBuilderWorkspaceState() {
         setDraft("");
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to create workspace thread", error);
+        console.error("[Khwarizm Builder] Failed to create workspace thread", error);
       }
     })();
   }, [refreshWorkspaces]);
@@ -348,7 +348,7 @@ export function useBuilderWorkspaceState() {
         }));
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to rename thread", error);
+        console.error("[Khwarizm Builder] Failed to rename thread", error);
       }
     })();
   }, [conversations, refreshWorkspaces]);
@@ -373,7 +373,7 @@ export function useBuilderWorkspaceState() {
         }
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to delete thread", error);
+        console.error("[Khwarizm Builder] Failed to delete thread", error);
       }
     })();
   }, [activeConversationId, refreshWorkspaces]);
@@ -398,7 +398,7 @@ export function useBuilderWorkspaceState() {
         }
         await refreshWorkspaces();
       } catch (error) {
-        console.error("[CodeGuard Builder] Failed to archive thread", error);
+        console.error("[Khwarizm Builder] Failed to archive thread", error);
       }
     })();
   }, [activeConversationId, refreshWorkspaces]);
@@ -464,7 +464,7 @@ async function pickWorkspacePath(): Promise<string | null> {
       }
       return null;
     } catch (error) {
-      console.error("[CodeGuard Builder] Native folder picker failed", error);
+      console.error("[Khwarizm Builder] Native folder picker failed", error);
     }
   }
 

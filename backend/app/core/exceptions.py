@@ -1,12 +1,12 @@
-class CodeGuardError(Exception):
+class KhwarizmError(Exception):
     pass
 
 
-class InvalidSourcePathError(CodeGuardError):
+class InvalidSourcePathError(KhwarizmError):
     pass
 
 
-class ExternalAIServiceError(CodeGuardError):
+class ExternalAIServiceError(KhwarizmError):
     def __init__(
         self,
         message: str,
@@ -23,5 +23,5 @@ class ExternalAIServiceError(CodeGuardError):
         self.failure_kind = failure_kind
 
 
-class WorkflowConflictError(CodeGuardError):
+class WorkflowConflictError(KhwarizmError):
     pass

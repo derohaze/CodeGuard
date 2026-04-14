@@ -42,7 +42,7 @@ export function DecisionCenterScreen({ finding, onBack, onSuggestFix, onOpenPoli
             </span>
           </div>
           <p className="mt-4 text-sm leading-6 text-txt-secondary">
-            This screen explains why CodeGuard recommends action on this finding, how much decision pressure remains, and what approval path should be followed next.
+            This screen explains why Khwarizm recommends action on this finding, how much decision pressure remains, and what approval path should be followed next.
           </p>
         </section>
 
@@ -92,7 +92,7 @@ export function DecisionCenterScreen({ finding, onBack, onSuggestFix, onOpenPoli
         >
           <div className="mb-3 flex items-center gap-2">
             <ShieldAlert size={16} className="text-status-high" />
-            <p className="text-sm font-semibold text-txt-primary">Why CodeGuard recommends this path</p>
+            <p className="text-sm font-semibold text-txt-primary">Why Khwarizm recommends this path</p>
           </div>
           <div className="space-y-3">
             <DecisionRow label="Fix strategy" value={decision.fixRecommendation} />
@@ -108,7 +108,7 @@ export function DecisionCenterScreen({ finding, onBack, onSuggestFix, onOpenPoli
             />
             <DecisionRow
               label="Policy controls"
-              value={`Auto path: ${decision.policySummary.autoPathState} · Human path: ${decision.policySummary.humanPathState} · Next control: ${decision.policySummary.nextControl}`}
+              value={`Auto path: ${decision.policySummary.autoPathState} Â· Human path: ${decision.policySummary.humanPathState} Â· Next control: ${decision.policySummary.nextControl}`}
               tone={decision.policySummary.posture === "block" ? "danger" : "default"}
             />
             <DecisionRow

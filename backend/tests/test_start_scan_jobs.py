@@ -72,7 +72,7 @@ class StartScanJobTests(unittest.TestCase):
         self.assertIsNotNone(session.latest_scan_job)
         self.assertEqual(session.latest_scan_job["id"], job.id)
         self.assertEqual(session.latest_scan_job["status"], "queued")
-        self.assertEqual(job.queue_name, "codeguard:queue:scan")
+        self.assertEqual(job.queue_name, "khwarizm:queue:scan")
 
 
 if __name__ == "__main__":

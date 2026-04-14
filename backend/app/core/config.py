@@ -11,7 +11,7 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ENV_FILE), env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = Field(default="CodeGuard", alias="APP_NAME")
+    app_name: str = Field(default="Khwarizm", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
     app_host: str = Field(default="127.0.0.1", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     mongodb_uri: str = Field(alias="MONGODB_URI")
     mongodb_fallback_uri: str | None = Field(default=None, alias="MONGODB_FALLBACK_URI")
-    mongodb_database: str = Field(default="CodeGuard", alias="MONGODB_DATABASE")
+    mongodb_database: str = Field(default="Khwarizm", alias="MONGODB_DATABASE")
     mongodb_max_pool_size: int = Field(default=30, alias="MONGODB_MAX_POOL_SIZE")
     mongodb_min_pool_size: int = Field(default=5, alias="MONGODB_MIN_POOL_SIZE")
     mongodb_server_selection_timeout_ms: int = Field(default=3000, alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
@@ -47,10 +47,10 @@ class Settings(BaseSettings):
     auto_start_queue_worker: bool = Field(default=True, alias="AUTO_START_QUEUE_WORKER")
     scan_lock_backend: str = Field(default="auto", alias="SCAN_LOCK_BACKEND")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
-    scan_queue_name: str = Field(default="codeguard:queue:scan", alias="SCAN_QUEUE_NAME")
-    ai_queue_name: str = Field(default="codeguard:queue:ai", alias="AI_QUEUE_NAME")
-    verify_queue_name: str = Field(default="codeguard:queue:verify", alias="VERIFY_QUEUE_NAME")
-    report_queue_name: str = Field(default="codeguard:queue:report", alias="REPORT_QUEUE_NAME")
+    scan_queue_name: str = Field(default="khwarizm:queue:scan", alias="SCAN_QUEUE_NAME")
+    ai_queue_name: str = Field(default="khwarizm:queue:ai", alias="AI_QUEUE_NAME")
+    verify_queue_name: str = Field(default="khwarizm:queue:verify", alias="VERIFY_QUEUE_NAME")
+    report_queue_name: str = Field(default="khwarizm:queue:report", alias="REPORT_QUEUE_NAME")
     scan_job_timeout_seconds: int = Field(default=1800, alias="SCAN_JOB_TIMEOUT_SECONDS")
     worker_concurrency: int = Field(default=4, alias="WORKER_CONCURRENCY")
     worker_max_jobs: int = Field(default=4, alias="WORKER_MAX_JOBS")

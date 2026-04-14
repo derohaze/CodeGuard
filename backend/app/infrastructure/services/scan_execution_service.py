@@ -48,7 +48,7 @@ from app.infrastructure.services.segmentation_planning import build_scan_work_un
 from app.infrastructure.services.risk_prioritization import prioritize_review_queue
 from app.infrastructure.services.source_sink_registry import build_source_sink_registry
 
-logger = logging.getLogger("codeguard.scan")
+logger = logging.getLogger("khwarizm.scan")
 
 
 def create_initial_session(source_path: str, target_type: str, preset: str, scan_mode: str = "deep") -> ScanSessionEntity:
@@ -1151,7 +1151,7 @@ class ScanExecutionService:
 def _build_scan_failure_message(exc: Exception) -> str:
     if isinstance(exc, ExternalAIServiceError):
         return sanitize_runtime_error(exc, operation="scan")
-    return "The scan failed because CodeGuard could not complete its AI analysis. Check the server logs and retry the request."
+    return "The scan failed because Khwarizm could not complete its AI analysis. Check the server logs and retry the request."
 
 
 def collect_heuristic_candidates(files: list[Path], source_root: Path) -> list[dict]:
@@ -1268,11 +1268,11 @@ def build_repository_summary(profile: dict, repository_artifacts: dict, findings
     coverage = repository_artifacts["coverage"]
     if not findings:
         return (
-            f"CodeGuard reviewed a {stack} codebase, mapped {coverage['route_files']} route files and "
+            f"Khwarizm reviewed a {stack} codebase, mapped {coverage['route_files']} route files and "
             f"{coverage['auth_files']} auth surfaces, and did not confirm a high-confidence issue in the selected scope."
         )
     return (
-        f"CodeGuard reviewed a {stack} codebase, mapped {coverage['route_files']} route files and "
+        f"Khwarizm reviewed a {stack} codebase, mapped {coverage['route_files']} route files and "
         f"{coverage['auth_files']} auth surfaces, and confirmed {len(findings)} validated findings."
     )
 

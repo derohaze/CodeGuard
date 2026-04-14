@@ -4,17 +4,17 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.core.exceptions import CodeGuardError
+from app.core.exceptions import KhwarizmError
 
 
-logger = logging.getLogger("codeguard.api")
+logger = logging.getLogger("khwarizm.api")
 
 
 def register_error_handlers(app: FastAPI) -> None:
-    @app.exception_handler(CodeGuardError)
-    async def handle_codeguard_error(_: Request, exc: CodeGuardError):
+    @app.exception_handler(KhwarizmError)
+    async def handle_khwarizm_error(_: Request, exc: KhwarizmError):
         error_id = str(uuid4())
-        logger.warning("Handled CodeGuard error", extra={"error_id": error_id}, exc_info=exc)
+        logger.warning("Handled Khwarizm error", extra={"error_id": error_id}, exc_info=exc)
         return JSONResponse(
             status_code=400,
             content={

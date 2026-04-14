@@ -1,4 +1,4 @@
-Shared remediation policy for CodeGuard:
+Shared remediation policy for Khwarizm:
 
 - Prefer complete sink-level or service-layer fixes over router-only filtering.
 - Distinguish clearly between:

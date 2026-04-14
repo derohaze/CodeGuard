@@ -16,7 +16,7 @@ def _settings() -> SimpleNamespace:
     return SimpleNamespace(
         mongodb_uri="mongodb://primary-uri",
         mongodb_fallback_uri="mongodb://fallback-uri",
-        mongodb_database="CodeGuard",
+        mongodb_database="Khwarizm",
         mongodb_max_pool_size=30,
         mongodb_min_pool_size=5,
         mongodb_server_selection_timeout_ms=3000,

@@ -237,7 +237,7 @@ export default function Page() {
       setSessions(nextSessions);
       syncSessionOrder(nextSessions);
     } catch (error) {
-      console.error("[CodeGuard] Failed to refresh sessions", error);
+      console.error("[Khwarizm] Failed to refresh sessions", error);
       setSessions([]);
       setSessionOrder([]);
     }
@@ -294,13 +294,13 @@ export default function Page() {
       if (summaryResult.status === "fulfilled") {
         setRepoIntelligenceSummary(summaryResult.value);
       } else {
-        console.error("[CodeGuard] Failed to load repo intelligence summary", summaryResult.reason);
+        console.error("[Khwarizm] Failed to load repo intelligence summary", summaryResult.reason);
         setRepoIntelligenceSummary(null);
       }
       if (feedResult.status === "fulfilled") {
         setRepoHotspotFeed(feedResult.value);
       } else {
-        console.error("[CodeGuard] Failed to load repo hotspot feed", feedResult.reason);
+        console.error("[Khwarizm] Failed to load repo hotspot feed", feedResult.reason);
         setRepoHotspotFeed(null);
       }
     });
@@ -325,13 +325,13 @@ export default function Page() {
       if (summaryResult.status === "fulfilled") {
         setTeamPostureSummary(summaryResult.value);
       } else {
-        console.error("[CodeGuard] Failed to load team posture summary", summaryResult.reason);
+        console.error("[Khwarizm] Failed to load team posture summary", summaryResult.reason);
         setTeamPostureSummary(null);
       }
       if (feedResult.status === "fulfilled") {
         setTeamPostureFeed(feedResult.value);
       } else {
-        console.error("[CodeGuard] Failed to load team posture feed", feedResult.reason);
+        console.error("[Khwarizm] Failed to load team posture feed", feedResult.reason);
         setTeamPostureFeed(null);
       }
     });
@@ -356,13 +356,13 @@ export default function Page() {
       if (summaryResult.status === "fulfilled") {
         setServiceExposureSummary(summaryResult.value);
       } else {
-        console.error("[CodeGuard] Failed to load service exposure summary", summaryResult.reason);
+        console.error("[Khwarizm] Failed to load service exposure summary", summaryResult.reason);
         setServiceExposureSummary(null);
       }
       if (feedResult.status === "fulfilled") {
         setServiceExposureFeed(feedResult.value);
       } else {
-        console.error("[CodeGuard] Failed to load service exposure feed", feedResult.reason);
+        console.error("[Khwarizm] Failed to load service exposure feed", feedResult.reason);
         setServiceExposureFeed(null);
       }
     });
@@ -480,7 +480,7 @@ export default function Page() {
       syncSessionOrder([detail.session, ...sessions.filter((item) => item.id !== detail.session.id)]);
       setScreen("scan-progress");
     } catch (error) {
-      console.error("[CodeGuard] Failed to start scan", error);
+      console.error("[Khwarizm] Failed to start scan", error);
       const message = error instanceof Error ? error.message : "Unable to start the scan.";
       toast.error(message);
     }
@@ -947,7 +947,7 @@ export default function Page() {
         }),
       );
     } catch (error) {
-      console.error("[CodeGuard] Failed to open scan session", error);
+      console.error("[Khwarizm] Failed to open scan session", error);
       const message = error instanceof Error ? toAnalystCopy(error.message) : "Unable to open the analyst session.";
       toast.error(message);
     }
@@ -995,7 +995,7 @@ export default function Page() {
         toast.success("All analyst sessions were deleted successfully.");
       }
     } catch (error) {
-      console.error("[CodeGuard] Failed to delete scan session", error);
+      console.error("[Khwarizm] Failed to delete scan session", error);
       const message = error instanceof Error ? toAnalystCopy(error.message) : "Unable to delete the analyst session.";
       toast.error(message);
     } finally {

@@ -62,7 +62,7 @@ export function SuggestFixScreen({ onComplete, onInvalidatedFinding, finding, fi
         applyPlan(plan);
     } catch (error) {
       if (!active) return;
-      console.error("[CodeGuard] Failed to generate remediation plan", error);
+      console.error("[Khwarizm] Failed to generate remediation plan", error);
       if (error instanceof Error && error.message.toLowerCase().includes("invalidated during remediation preflight")) {
         await onInvalidatedFinding?.();
         return;
@@ -172,7 +172,7 @@ export function SuggestFixScreen({ onComplete, onInvalidatedFinding, finding, fi
       });
       applyPlan(nextPlan);
     } catch (error) {
-      console.error("[CodeGuard] Failed to regenerate remediation plan", error);
+      console.error("[Khwarizm] Failed to regenerate remediation plan", error);
       if (error instanceof Error && error.message.toLowerCase().includes("invalidated during remediation preflight")) {
         await onInvalidatedFinding?.();
         return;

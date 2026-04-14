@@ -1,5 +1,5 @@
 # 1. Executive Summary
-This phase introduces a production-shaped learning data foundation for CodeGuard without training models. It captures internal security outcomes, ingests external security knowledge, normalizes both into versioned schemas, stores large payloads safely in chunked Mongo documents, and evaluates behavior through benchmark suites.
+This phase introduces a production-shaped learning data foundation for Khwarizm without training models. It captures internal security outcomes, ingests external security knowledge, normalizes both into versioned schemas, stores large payloads safely in chunked Mongo documents, and evaluates behavior through benchmark suites.
 
 Implemented baseline is provider-compatible today (external LLM providers remain unchanged) and future-ready for fine-tuning/reranking exports.
 

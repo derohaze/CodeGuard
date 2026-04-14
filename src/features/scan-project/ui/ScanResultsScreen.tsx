@@ -73,7 +73,7 @@ export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueu
             {safeVerdict ? "No validated security issue was confirmed in the selected scope." : "Validated repository assessment"}
           </p>
           <p className="mt-2 text-sm leading-6 text-txt-secondary">
-            {toAnalystCopy(session.session.repositorySummary) || (safeVerdict ? "The selected source was reviewed and no high-confidence issue was confirmed." : "CodeGuard completed the repository assessment.")}
+            {toAnalystCopy(session.session.repositorySummary) || (safeVerdict ? "The selected source was reviewed and no high-confidence issue was confirmed." : "Khwarizm completed the repository assessment.")}
           </p>
           {!hasFindings && hasCoverageGap && (
             <p className="mt-2 text-sm leading-6 text-txt-secondary">
@@ -95,7 +95,7 @@ export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueu
               <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">Security score</p>
               <div className="mt-2 flex items-end gap-2">
                 <span className="text-[34px] font-semibold leading-none tracking-[-0.05em] text-txt-primary">
-                  {hasSecurityScore ? session.session.securityScore : "—"}
+                  {hasSecurityScore ? session.session.securityScore : "â€”"}
                 </span>
                 <span className="pb-0.5 text-xs text-txt-tertiary">{hasSecurityScore ? "/100" : "unavailable"}</span>
               </div>

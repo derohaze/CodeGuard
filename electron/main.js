@@ -7,7 +7,7 @@ const INITIAL_WINDOW_HEIGHT = 720;
 const MIN_WINDOW_WIDTH = 980;
 const MIN_WINDOW_HEIGHT = 640;
 
-app.setName('CodeGuard');
+app.setName('Khwarizm');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,7 +25,7 @@ function createWindow() {
       symbolColor: '#2a241e',
       height: 32
     },
-    title: 'CodeGuard',
+    title: 'Khwarizm',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -36,8 +36,8 @@ function createWindow() {
 
   mainWindow.removeMenu();
 
-  // في Development mode هنحمل من Vite dev server
-  // في Production هنحمل من الملفات المبنية
+  // ÙÙŠ Development mode Ù‡Ù†Ø­Ù…Ù„ Ù…Ù† Vite dev server
+  // ÙÙŠ Production Ù‡Ù†Ø­Ù…Ù„ Ù…Ù† Ø§Ù„Ù…Ù„ÙØ§Øª Ø§Ù„Ù…Ø¨Ù†ÙŠØ©
   const isDev = process.env.NODE_ENV === 'development';
   
   if (isDev) {
@@ -47,7 +47,7 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  mainWindow.setTitle('CodeGuard');
+  mainWindow.setTitle('Khwarizm');
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return;
     if (mainWindow.isMaximized()) {
