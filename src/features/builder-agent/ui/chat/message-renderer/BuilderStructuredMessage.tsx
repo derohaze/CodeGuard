@@ -195,12 +195,12 @@ function RenderedBlock({
             more: "Show code",
           }}
         >
-          <div className="overflow-hidden rounded-[20px] border border-border-soft bg-[#201c18] text-[#f6efe6] shadow-[0_10px_24px_rgba(18,14,10,0.14)]">
+          <div className="overflow-hidden rounded-[20px] border border-border-soft bg-[#201c18] text-[#f6efe6] shadow-[0_10px_24px_rgba(18,14,10,0.14)] [&_pre]:m-0 [&_pre]:bg-transparent [&_pre]:text-[#f6efe6] [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre_code]:rounded-none [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-[12px] text-[#cbb8a5]">
               <span>{block.language ?? "code"}</span>
             </div>
             <pre className="overflow-x-auto p-4 text-[12px] leading-[1.35rem]">
-              <code>{block.code}</code>
+              <code className="block bg-transparent p-0 text-inherit">{block.code}</code>
             </pre>
           </div>
         </ExpandableSection>

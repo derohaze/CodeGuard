@@ -34,6 +34,7 @@ export function BuilderConversationView({
   registerScrollToLatest,
 }: BuilderConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const followOutputRef = useRef(true);
   const scrollFrameRef = useRef<number | null>(null);
   const scrollTargetRef = useRef<number>(0);
@@ -204,6 +205,56 @@ export function BuilderConversationView({
     startSmoothScrollToBottom();
   }, [messages, startSmoothScrollToBottom]);
 
+  useEffect(() => {
+    const container = scrollRef.current;
+    const content = contentRef.current;
+    if (!container || !content) {
+      return;
+    }
+
+    let lastObservedHeight = content.getBoundingClientRect().height;
+    const handleContentGrowth = (nextHeight: number) => {
+      if (Math.abs(nextHeight - lastObservedHeight) <= 0.5) {
+        return;
+      }
+
+      lastObservedHeight = nextHeight;
+      if (followOutputRef.current) {
+        startSmoothScrollToBottom();
+      }
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (!entry) return;
+            handleContentGrowth(entry.contentRect.height);
+          })
+        : null;
+
+    const mutationObserver =
+      typeof MutationObserver !== "undefined"
+        ? new MutationObserver(() => {
+            const nextHeight = content.getBoundingClientRect().height;
+            handleContentGrowth(nextHeight);
+          })
+        : null;
+
+    resizeObserver?.observe(content);
+    mutationObserver?.observe(content, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+
+    return () => {
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [startSmoothScrollToBottom]);
+
   useEffect(() => () => {
     if (scrollFrameRef.current !== null) {
       window.cancelAnimationFrame(scrollFrameRef.current);
@@ -261,7 +312,7 @@ export function BuilderConversationView({
       </div>
 
       <div ref={scrollRef} className="hide-scrollbar relative flex-1 overflow-y-auto dotted-bg px-8 py-8">
-        <div className="mx-auto flex w-full max-w-[980px] flex-col gap-4">
+        <div ref={contentRef} className="mx-auto flex w-full max-w-[980px] flex-col gap-4">
           {messages.map((message) =>
             message.role === "user" ? (
               <div
