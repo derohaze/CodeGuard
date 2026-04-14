@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 import re
 
+from app.builder_agent.context import BuilderContextManager, BuilderTokenUsage, PreparedBuilderContext
 from app.builder_agent.repository import BuilderAgentRepository
 from app.core.config import get_settings
 from app.core.exceptions import CodeGuardError
@@ -13,9 +14,11 @@ class BuilderAgentService:
         self,
         repository: BuilderAgentRepository,
         provider,
+        context_manager: BuilderContextManager | None = None,
     ) -> None:
         self.repository = repository
         self.provider = provider
+        self.context_manager = context_manager or BuilderContextManager(repository)
 
     async def list_workspaces(self) -> list[dict]:
         return await self.repository.list_workspaces()
@@ -81,13 +84,13 @@ class BuilderAgentService:
         detail = await self.repository.get_thread_detail(str(thread["thread_id"]))
         if detail is None:
             raise CodeGuardError("Unable to create builder thread.")
-        return detail
+        return await self._with_context_state(detail)
 
     async def get_thread(self, thread_id: str) -> dict:
         detail = await self.repository.get_thread_detail(thread_id)
         if detail is None:
             raise CodeGuardError("Thread not found.")
-        return detail
+        return await self._with_context_state(detail)
 
     async def rename_thread(self, thread_id: str, title: str) -> dict:
         normalized_title = title.strip()
@@ -101,7 +104,7 @@ class BuilderAgentService:
         detail = await self.repository.get_thread_detail(thread_id)
         if detail is None:
             raise CodeGuardError("Thread not found.")
-        return detail
+        return await self._with_context_state(detail)
 
     async def delete_thread(self, thread_id: str) -> None:
         thread = await self.repository.get_thread(thread_id)
@@ -130,16 +133,18 @@ class BuilderAgentService:
         plan_mode: bool,
         response_speed: str,
     ) -> dict:
-        _ = permission_mode
-        _ = plan_mode
-        _ = response_speed
-
-        normalized_workspace_id, active_thread_id, provider_messages = await self._prepare_thread_and_messages(
+        normalized_workspace_id, active_thread_id, prepared_context = await self._prepare_thread_and_messages(
             workspace_id=workspace_id,
             thread_id=thread_id,
             message=message,
+            permission_mode=permission_mode,
+            plan_mode=plan_mode,
+            response_speed=response_speed,
         )
-        assistant_text, model = await self.provider.generate_reply(provider_messages)
+        raw_provider_reply = await self.provider.generate_reply(prepared_context.provider_messages)
+        provider_reply = _coerce_provider_reply(raw_provider_reply)
+        assistant_text = provider_reply.text
+        model = provider_reply.model
 
         assistant_message = await self.repository.add_message(
             workspace_id=normalized_workspace_id,
@@ -148,13 +153,22 @@ class BuilderAgentService:
             text=assistant_text,
             model=model,
         )
-
+        context_state = await self.context_manager.record_completion(
+            workspace_id=normalized_workspace_id,
+            thread_id=active_thread_id,
+            permission_mode=permission_mode,
+            plan_mode=plan_mode,
+            provider_usage=_map_provider_usage(provider_reply.usage),
+        )
         detail = await self.repository.get_thread_detail(active_thread_id)
         if detail is None:
             raise CodeGuardError("Thread not found.")
 
         return {
-            "thread": detail,
+            "thread": {
+                **detail,
+                "context_state": context_state,
+            },
             "assistant_message": {
                 "id": str(assistant_message["message_id"]),
                 "role": str(assistant_message["role"]),
@@ -174,25 +188,26 @@ class BuilderAgentService:
         plan_mode: bool,
         response_speed: str,
     ) -> AsyncIterator[dict]:
-        _ = permission_mode
-        _ = plan_mode
-        _ = response_speed
-
-        normalized_workspace_id, active_thread_id, provider_messages = await self._prepare_thread_and_messages(
+        normalized_workspace_id, active_thread_id, prepared_context = await self._prepare_thread_and_messages(
             workspace_id=workspace_id,
             thread_id=thread_id,
             message=message,
+            permission_mode=permission_mode,
+            plan_mode=plan_mode,
+            response_speed=response_speed,
         )
 
         accumulated: list[str] = []
         model = get_settings().builder_chat_model
+        provider_usage: BuilderTokenUsage | None = None
 
         yield {
             "type": "ack",
             "thread_id": active_thread_id,
             "workspace_id": normalized_workspace_id,
+            "context_state": prepared_context.context_state,
         }
-        async for chunk in self.provider.generate_reply_stream(provider_messages):
+        async for chunk in self.provider.generate_reply_stream(prepared_context.provider_messages):
             chunk_type = str(chunk.get("type", ""))
             if chunk_type == "token":
                 text = str(chunk.get("text", ""))
@@ -215,6 +230,12 @@ class BuilderAgentService:
                 next_model = str(chunk.get("model", "")).strip()
                 if next_model:
                     model = next_model
+            elif chunk_type == "usage":
+                provider_usage = BuilderTokenUsage(
+                    input_tokens=_safe_optional_int(chunk.get("input_tokens")),
+                    output_tokens=_safe_optional_int(chunk.get("output_tokens")),
+                    total_tokens=_safe_optional_int(chunk.get("total_tokens")),
+                )
 
         assistant_text = "".join(accumulated).strip()
         if not assistant_text:
@@ -227,13 +248,23 @@ class BuilderAgentService:
             text=assistant_text,
             model=model,
         )
+        context_state = await self.context_manager.record_completion(
+            workspace_id=normalized_workspace_id,
+            thread_id=active_thread_id,
+            permission_mode=permission_mode,
+            plan_mode=plan_mode,
+            provider_usage=provider_usage,
+        )
         detail = await self.repository.get_thread_detail(active_thread_id)
         if detail is None:
             raise CodeGuardError("Thread not found.")
 
         yield {
             "type": "done",
-            "thread": detail,
+            "thread": {
+                **detail,
+                "context_state": context_state,
+            },
             "assistant_message": {
                 "id": str(assistant_message["message_id"]),
                 "role": str(assistant_message["role"]),
@@ -249,7 +280,10 @@ class BuilderAgentService:
         workspace_id: str,
         thread_id: str | None,
         message: str,
-    ) -> tuple[str, str, list[dict[str, str]]]:
+        permission_mode: str,
+        plan_mode: bool,
+        response_speed: str,
+    ) -> tuple[str, str, PreparedBuilderContext]:
         normalized_workspace_id = workspace_id.strip()
         if not normalized_workspace_id:
             raise CodeGuardError("workspace_id is required.")
@@ -284,21 +318,24 @@ class BuilderAgentService:
             role="user",
             text=normalized_message,
         )
-
-        settings = get_settings()
-        recent = await self.repository.list_recent_messages(
-            active_thread_id,
-            limit=settings.builder_chat_max_history_messages,
+        prepared_context = await self.context_manager.prepare_context(
+            workspace_id=normalized_workspace_id,
+            thread_id=active_thread_id,
+            permission_mode=permission_mode,
+            plan_mode=plan_mode,
+            response_speed=response_speed,
         )
-        provider_messages = [
-            {
-                "role": str(item["role"]),
-                "content": str(item["text"]),
-            }
-            for item in recent
-            if str(item.get("role")) in {"user", "assistant"}
-        ]
-        return normalized_workspace_id, active_thread_id, provider_messages
+        return normalized_workspace_id, active_thread_id, prepared_context
+
+    async def _with_context_state(self, detail: dict) -> dict:
+        context_state = await self.context_manager.get_thread_context_state(
+            workspace_id=str(detail["workspace_id"]),
+            thread_id=str(detail["id"]),
+        )
+        return {
+            **detail,
+            "context_state": context_state,
+        }
 
 
 def _label_from_path(path: str) -> str:
@@ -366,14 +403,14 @@ def _strip_title_prefixes(text: str) -> str:
         "documentation about ",
         "explain ",
         "tell me about ",
-        "موضوع عن ",
-        "اكتب عن ",
-        "اكتبلي عن ",
-        "اعمل موضوع عن ",
-        "عايز موضوع عن ",
-        "عايز عنوان عن ",
-        "مقال عن ",
-        "شرح عن ",
+        "\u0645\u0648\u0636\u0648\u0639 \u0639\u0646 ",
+        "\u0627\u0643\u062a\u0628 \u0639\u0646 ",
+        "\u0627\u0643\u062a\u0628\u0644\u064a \u0639\u0646 ",
+        "\u0627\u0639\u0645\u0644 \u0645\u0648\u0636\u0648\u0639 \u0639\u0646 ",
+        "\u0639\u0627\u064a\u0632 \u0645\u0648\u0636\u0648\u0639 \u0639\u0646 ",
+        "\u0639\u0627\u064a\u0632 \u0639\u0646\u0648\u0627\u0646 \u0639\u0646 ",
+        "\u0645\u0642\u0627\u0644 \u0639\u0646 ",
+        "\u0634\u0631\u062d \u0639\u0646 ",
     )
 
     lowered = text.casefold()
@@ -399,3 +436,40 @@ def _sentence_case_title(text: str) -> str:
         else:
             transformed.append(part)
     return "".join(transformed)
+
+
+def _map_provider_usage(value) -> BuilderTokenUsage | None:
+    if value is None:
+        return None
+    return BuilderTokenUsage(
+        input_tokens=_safe_optional_int(getattr(value, "input_tokens", None)),
+        output_tokens=_safe_optional_int(getattr(value, "output_tokens", None)),
+        total_tokens=_safe_optional_int(getattr(value, "total_tokens", None)),
+    )
+
+
+def _coerce_provider_reply(value) -> object:
+    if hasattr(value, "text") and hasattr(value, "model"):
+        return value
+    if isinstance(value, tuple) and len(value) >= 2:
+        text, model = value[0], value[1]
+        usage = value[2] if len(value) > 2 else None
+
+        class _LegacyProviderReply:
+            def __init__(self, text_value, model_value, usage_value) -> None:
+                self.text = str(text_value)
+                self.model = str(model_value)
+                self.usage = usage_value
+
+        return _LegacyProviderReply(text, model, usage)
+    raise CodeGuardError("Builder provider returned an unsupported reply payload.")
+
+
+def _safe_optional_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None

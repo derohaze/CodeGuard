@@ -14,6 +14,25 @@ class BuilderMessageResponse(BaseModel):
     model: str | None = None
 
 
+class BuilderContextMemoryResponse(BaseModel):
+    id: str
+    memory_class: str
+    title: str
+    content: str
+    updated_at: datetime | None = None
+
+
+class BuilderContextStateResponse(BaseModel):
+    percentage: int
+    used_tokens: int
+    max_tokens: int
+    rolling_summary: str
+    recent_message_count: int
+    memory_count: int
+    memory_items: list[BuilderContextMemoryResponse] = []
+    updated_at: datetime | None = None
+
+
 class BuilderThreadSummaryResponse(BaseModel):
     id: str
     title: str
@@ -38,6 +57,7 @@ class BuilderThreadResponse(BaseModel):
     title: str
     updated_at: datetime
     messages: list[BuilderMessageResponse]
+    context_state: BuilderContextStateResponse | None = None
 
 
 class CreateBuilderWorkspaceRequest(BaseModel):
@@ -69,4 +89,3 @@ class SendBuilderMessageRequest(BaseModel):
 class SendBuilderMessageResponse(BaseModel):
     thread: BuilderThreadResponse
     assistant_message: BuilderMessageResponse
-

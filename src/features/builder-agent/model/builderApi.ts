@@ -10,12 +10,32 @@ export interface BuilderMessageDto {
   model: string | null;
 }
 
+export interface BuilderContextMemoryDto {
+  id: string;
+  memoryClass: string;
+  title: string;
+  content: string;
+  updatedAt: string | null;
+}
+
+export interface BuilderContextStateDto {
+  percentage: number;
+  usedTokens: number;
+  maxTokens: number;
+  rollingSummary: string;
+  recentMessageCount: number;
+  memoryCount: number;
+  memoryItems: BuilderContextMemoryDto[];
+  updatedAt: string | null;
+}
+
 export interface BuilderThreadDto {
   id: string;
   workspaceId: string;
   title: string;
   updatedAt: string;
   messages: BuilderMessageDto[];
+  contextState: BuilderContextStateDto | null;
 }
 
 export interface BuilderThreadSummaryDto {
@@ -48,6 +68,8 @@ export interface SendBuilderMessageResult {
 
 export interface SendBuilderMessageStreamHandlers {
   onToken: (token: string) => void;
+  onAck?: (payload: { threadId: string; workspaceId: string; contextState: BuilderContextStateDto | null }) => void;
+  onContextState?: (state: BuilderContextStateDto) => void;
   onReasoning?: (text: string) => void;
 }
 
@@ -212,6 +234,22 @@ export async function sendBuilderMessageStream(
       }
       return;
     }
+    if (eventName === "ack") {
+      const contextState = mapContextState(eventPayload.context_state as BuilderContextStateApiResponse | null | undefined);
+      const threadId = typeof eventPayload.thread_id === "string" ? eventPayload.thread_id : "";
+      const workspaceId = typeof eventPayload.workspace_id === "string" ? eventPayload.workspace_id : "";
+      if (threadId && workspaceId) {
+        handlers.onAck?.({
+          threadId,
+          workspaceId,
+          contextState,
+        });
+      }
+      if (contextState) {
+        handlers.onContextState?.(contextState);
+      }
+      return;
+    }
     if (eventName === "reasoning") {
       const reasoning = typeof eventPayload.text === "string" ? eventPayload.text : "";
       if (reasoning) {
@@ -221,6 +259,9 @@ export async function sendBuilderMessageStream(
     }
     if (eventName === "done") {
       const thread = mapThread(eventPayload.thread as BuilderThreadApiResponse);
+      if (thread.contextState) {
+        handlers.onContextState?.(thread.contextState);
+      }
       const assistantMessage = mapMessage(eventPayload.assistant_message as BuilderMessageApiResponse);
       finalResult = {
         thread,
@@ -316,6 +357,32 @@ function mapMessage(data: BuilderMessageApiResponse): BuilderMessageDto {
   };
 }
 
+function mapContextMemory(data: BuilderContextMemoryApiResponse): BuilderContextMemoryDto {
+  return {
+    id: data.id,
+    memoryClass: data.memory_class,
+    title: data.title,
+    content: data.content,
+    updatedAt: data.updated_at ?? null,
+  };
+}
+
+function mapContextState(data: BuilderContextStateApiResponse | null | undefined): BuilderContextStateDto | null {
+  if (!data) {
+    return null;
+  }
+  return {
+    percentage: data.percentage,
+    usedTokens: data.used_tokens,
+    maxTokens: data.max_tokens,
+    rollingSummary: data.rolling_summary,
+    recentMessageCount: data.recent_message_count,
+    memoryCount: data.memory_count,
+    memoryItems: data.memory_items.map(mapContextMemory),
+    updatedAt: data.updated_at ?? null,
+  };
+}
+
 function mapThread(data: BuilderThreadApiResponse): BuilderThreadDto {
   return {
     id: data.id,
@@ -323,6 +390,7 @@ function mapThread(data: BuilderThreadApiResponse): BuilderThreadDto {
     title: data.title,
     updatedAt: data.updated_at,
     messages: data.messages.map(mapMessage),
+    contextState: mapContextState(data.context_state),
   };
 }
 
@@ -338,6 +406,25 @@ interface BuilderThreadSummaryApiResponse {
   id: string;
   title: string;
   updated_at: string;
+}
+
+interface BuilderContextMemoryApiResponse {
+  id: string;
+  memory_class: string;
+  title: string;
+  content: string;
+  updated_at: string | null;
+}
+
+interface BuilderContextStateApiResponse {
+  percentage: number;
+  used_tokens: number;
+  max_tokens: number;
+  rolling_summary: string;
+  recent_message_count: number;
+  memory_count: number;
+  memory_items: BuilderContextMemoryApiResponse[];
+  updated_at: string | null;
 }
 
 interface BuilderWorkspaceApiResponse {
@@ -358,6 +445,7 @@ interface BuilderThreadApiResponse {
   title: string;
   updated_at: string;
   messages: BuilderMessageApiResponse[];
+  context_state: BuilderContextStateApiResponse | null;
 }
 
 interface SendBuilderMessageApiResponse {

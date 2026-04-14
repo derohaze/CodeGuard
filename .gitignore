@@ -9,6 +9,12 @@ lerna-debug.log*
 .pytest_cache
 claude code
 
+pro
+
+claude-code-main
+
+
+.vscode
 node_modules
 dist
 dist-ssr

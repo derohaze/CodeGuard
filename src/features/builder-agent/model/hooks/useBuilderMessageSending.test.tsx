@@ -2,35 +2,50 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BuilderMessage } from "../mockBuilderAgent";
+import type { BuilderContextState } from "../lib/context-window";
 import { useBuilderMessageSending } from "./useBuilderMessageSending";
 
-const createBuilderThreadMock = vi.fn();
 const sendBuilderMessageMock = vi.fn();
 const sendBuilderMessageStreamMock = vi.fn();
 
 vi.mock("../builderApi", () => ({
-  createBuilderThread: (...args: unknown[]) => createBuilderThreadMock(...args),
   sendBuilderMessage: (...args: unknown[]) => sendBuilderMessageMock(...args),
   sendBuilderMessageStream: (...args: unknown[]) => sendBuilderMessageStreamMock(...args),
 }));
 
 describe("useBuilderMessageSending", () => {
   beforeEach(() => {
-    createBuilderThreadMock.mockReset();
     sendBuilderMessageMock.mockReset();
     sendBuilderMessageStreamMock.mockReset();
   });
 
-  it("updates the assistant message before the final stream payload arrives", async () => {
-    createBuilderThreadMock.mockResolvedValue({
-      id: "thread-1",
-      workspaceId: "workspace-1",
-      title: "New chat",
-      updatedAt: "2026-04-14T00:00:00Z",
-      messages: [],
-    });
-
+  it("streams immediately in a new chat without bootstrapping a thread first", async () => {
     sendBuilderMessageStreamMock.mockImplementation(async (_payload, handlers) => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+      handlers.onAck?.({
+        threadId: "thread-1",
+        workspaceId: "workspace-1",
+        contextState: {
+          percentage: 18,
+          usedTokens: 4320,
+          maxTokens: 24000,
+          rollingSummary: "Builder thread created.",
+          recentMessageCount: 1,
+          memoryCount: 0,
+          memoryItems: [],
+          updatedAt: "2026-04-14T00:00:00Z",
+        },
+      });
+      handlers.onContextState?.({
+        percentage: 26,
+        usedTokens: 6240,
+        maxTokens: 24000,
+        rollingSummary: "User opened a new chat.",
+        recentMessageCount: 1,
+        memoryCount: 0,
+        memoryItems: [],
+        updatedAt: "2026-04-14T00:00:00Z",
+      });
       handlers.onToken("Streaming ");
       await new Promise((resolve) => window.setTimeout(resolve, 120));
       handlers.onToken("reply");
@@ -41,6 +56,24 @@ describe("useBuilderMessageSending", () => {
           workspaceId: "workspace-1",
           title: "Streaming reply",
           updatedAt: "2026-04-14T00:00:02Z",
+          contextState: {
+            percentage: 34,
+            usedTokens: 8160,
+            maxTokens: 24000,
+            rollingSummary: "Streaming reply completed.",
+            recentMessageCount: 2,
+            memoryCount: 1,
+            memoryItems: [
+              {
+                id: "memory-1",
+                memoryClass: "goal",
+                title: "Greeting",
+                content: "User greeted the agent.",
+                updatedAt: "2026-04-14T00:00:02Z",
+              },
+            ],
+            updatedAt: "2026-04-14T00:00:02Z",
+          },
           messages: [
             {
               id: "user-1",
@@ -75,6 +108,7 @@ describe("useBuilderMessageSending", () => {
       const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>("workspace-1");
       const [draft, setDraft] = useState("hello");
       const [messageMap, setMessageMap] = useState<Record<string, BuilderMessage[]>>({});
+      const [contextStateMap, setContextStateMap] = useState<Record<string, BuilderContextState | null>>({});
 
       const sending = useBuilderMessageSending({
         activeConversationId,
@@ -89,6 +123,7 @@ describe("useBuilderMessageSending", () => {
         draft,
         refreshWorkspaces,
         setActiveConversationId,
+        setContextStateMap,
         setCurrentWorkspaceId,
         setDraft,
         setMessageMap,
@@ -99,6 +134,7 @@ describe("useBuilderMessageSending", () => {
         activeConversationId,
         currentWorkspaceId,
         draft,
+        contextStateMap,
         messageMap,
       };
     });
@@ -107,8 +143,27 @@ describe("useBuilderMessageSending", () => {
       result.current.sendMessage();
     });
 
+    expect(result.current.isPreparingResponse).toBe(true);
+    expect(result.current.isStreaming).toBe(false);
+    expect(result.current.draft).toBe("hello");
+    expect(result.current.prepareProgress).toBe(0);
+
+    await waitFor(() => {
+      expect(result.current.prepareProgress).toBeGreaterThan(0);
+    });
+
+    expect(result.current.isPreparingResponse).toBe(true);
+    expect(result.current.isStreaming).toBe(false);
+
+    await waitFor(() => {
+      expect(result.current.draft).toBe("");
+      expect(result.current.isStreaming).toBe(true);
+      expect(result.current.isPreparingResponse).toBe(false);
+    });
+
     await waitFor(() => {
       expect(result.current.activeConversationId).toBe("thread-1");
+      expect(result.current.isPreparingResponse).toBe(false);
     });
 
     await waitFor(() => {
@@ -118,12 +173,24 @@ describe("useBuilderMessageSending", () => {
     });
 
     await waitFor(() => {
+      expect(result.current.contextStateMap["thread-1"]?.percentage).toBe(26);
+    });
+
+    await waitFor(() => {
       const assistant = result.current.messageMap["thread-1"]?.find((message) => message.role === "assistant");
       expect(assistant?.text).toBe("Streaming reply");
       expect(result.current.isStreaming).toBe(false);
+      expect(result.current.contextStateMap["thread-1"]?.percentage).toBe(34);
     });
 
     expect(refreshWorkspaces).toHaveBeenCalledTimes(1);
+    expect(sendBuilderMessageStreamMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threadId: null,
+      }),
+      expect.any(Object),
+      expect.any(AbortSignal),
+    );
     expect(sendBuilderMessageMock).not.toHaveBeenCalled();
   });
 });

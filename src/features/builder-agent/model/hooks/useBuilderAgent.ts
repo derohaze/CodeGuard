@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { builderPromptSuggestions } from "../mockBuilderAgent";
+import { resolveBuilderContextUsage } from "../lib/context-window";
 import { type PermissionMode, type ResponseSpeed } from "../lib/types";
 import { useBuilderComposerSettings } from "./useBuilderComposerSettings";
 import { useBuilderMessageSending } from "./useBuilderMessageSending";
@@ -8,7 +9,7 @@ import { useBuilderWorkspaceState } from "./useBuilderWorkspaceState";
 export function useBuilderAgent() {
   const workspaceState = useBuilderWorkspaceState();
   const { composerSettings, persistComposerSettings } = useBuilderComposerSettings();
-  const { isStreaming, sendMessage, stopStreaming } = useBuilderMessageSending({
+  const { isPreparingResponse, isStreaming, prepareProgress, sendMessage, stopStreaming } = useBuilderMessageSending({
     activeConversationId: workspaceState.activeConversationId,
     composerSettings,
     currentWorkspace: workspaceState.currentWorkspace,
@@ -16,6 +17,7 @@ export function useBuilderAgent() {
     draft: workspaceState.draft,
     refreshWorkspaces: workspaceState.refreshWorkspaces,
     setActiveConversationId: workspaceState.setActiveConversationId,
+    setContextStateMap: workspaceState.setContextStateMap,
     setCurrentWorkspaceId: workspaceState.setCurrentWorkspaceId,
     setDraft: workspaceState.setDraft,
     setMessageMap: workspaceState.setMessageMap,
@@ -75,17 +77,39 @@ export function useBuilderAgent() {
     [workspaceState.messageMap],
   );
 
+  const contextUsage = useMemo(
+    () =>
+      resolveBuilderContextUsage({
+        backendContextState: workspaceState.activeConversationId
+          ? workspaceState.contextStateMap[workspaceState.activeConversationId] ?? null
+          : null,
+        composerSettings,
+        draft: workspaceState.draft,
+        messages: workspaceState.messages,
+      }),
+    [
+      composerSettings,
+      workspaceState.activeConversationId,
+      workspaceState.contextStateMap,
+      workspaceState.draft,
+      workspaceState.messages,
+    ],
+  );
+
   return {
     activeConversation: workspaceState.activeConversation,
     activeConversationId: workspaceState.activeConversationId,
     currentWorkspace: workspaceState.currentWorkspace,
     draft: workspaceState.draft,
+    isPreparingResponse,
     expandedWorkspaceIds: workspaceState.expandedWorkspaceIds,
     isStreaming,
     messages: workspaceState.messages,
     composerSettings,
+    contextUsage,
     busyConversationIds,
     promptSuggestions: builderPromptSuggestions,
+    prepareProgress,
     showAllWorkspaceIds: workspaceState.showAllWorkspaceIds,
     sortMode: workspaceState.sortMode,
     threadGroups: workspaceState.sortedThreadGroups,

@@ -163,5 +163,6 @@ describe("BuilderSidebar", () => {
     );
 
     expect(screen.getByText("Working")).toBeInTheDocument();
+    expect(screen.getByRole("presentation", { hidden: true })).toBeInTheDocument();
   });
 });

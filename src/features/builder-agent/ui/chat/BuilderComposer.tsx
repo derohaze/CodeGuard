@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Loader } from "@/shared/ui/Loader";
 import {
   ArrowUp,
   ChevronDown,
@@ -33,11 +34,16 @@ import {
   Square,
   X,
 } from "lucide-react";
+import { ProgressCircle } from "@/components/ui/progress-circle";
 import type { BuilderComposerSettings } from "../../model/lib/types";
+import type { BuilderContextUsage } from "../../model/lib/context-window";
 
 interface BuilderComposerProps {
   composerSettings: BuilderComposerSettings;
+  contextUsage: BuilderContextUsage;
   draft: string;
+  prepareProgress: number;
+  isPreparingResponse: boolean;
   isStreaming: boolean;
   onDraftChange: (value: string) => void;
   onPermissionModeChange: (mode: "default" | "full-access") => void;
@@ -50,7 +56,10 @@ interface BuilderComposerProps {
 
 export function BuilderComposer({
   composerSettings,
+  contextUsage,
   draft,
+  prepareProgress,
+  isPreparingResponse,
   isStreaming,
   onDraftChange,
   onPermissionModeChange,
@@ -63,7 +72,12 @@ export function BuilderComposer({
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [pendingPermissionMode, setPendingPermissionMode] = useState<"default" | "full-access" | null>(null);
   const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
-  const contextUsage = 85;
+  const contextIndicatorColor =
+    contextUsage.percentage >= 90
+      ? "#b55349"
+      : contextUsage.percentage >= 70
+        ? "#c08b22"
+        : "#3f8f63";
 
   useEffect(() => {
     const element = inputRef.current;
@@ -210,15 +224,25 @@ export function BuilderComposer({
                     <button
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-45"
                       type="button"
-                      onClick={isStreaming ? onStopStreaming : onSend}
-                      disabled={!isStreaming && !draft.trim()}
-                      aria-label={isStreaming ? "Stop response" : "Send message"}
+                      onClick={isStreaming || isPreparingResponse ? onStopStreaming : onSend}
+                      disabled={!isStreaming && !isPreparingResponse && !draft.trim()}
+                      aria-label={isStreaming || isPreparingResponse ? "Stop response" : "Send message"}
                     >
-                      {isStreaming ? <Square size={14} fill="currentColor" /> : <ArrowUp size={16} />}
+                      {isPreparingResponse ? (
+                        <Loader
+                          variant="spin"
+                          className="size-4 text-current"
+                          aria-label="Preparing response"
+                        />
+                      ) : isStreaming ? (
+                        <Square size={14} fill="currentColor" />
+                      ) : (
+                        <ArrowUp size={16} />
+                      )}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" align="center" sideOffset={10} className="rounded-xl border border-border-soft bg-surface px-3 py-1.5 text-xs text-txt-primary shadow-md">
-                    {isStreaming ? "Stop response" : "Send"}
+                    {isPreparingResponse ? `Preparing response ${prepareProgress}%` : isStreaming ? "Stop response" : "Send"}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -266,13 +290,24 @@ export function BuilderComposer({
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <button type="button" className="inline-flex h-5 w-5 items-center justify-center text-[#8e8577]" aria-label="Context window usage">
-                  <ContextUsageRing value={contextUsage} />
+                <button
+                  type="button"
+                  className="inline-flex h-6 w-6 items-center justify-center"
+                  aria-label="Context window usage"
+                >
+                  <ProgressCircle
+                    aria-label="Context window usage"
+                    value={contextUsage.percentage}
+                    size={18}
+                    strokeWidth={3}
+                    trackColor="rgba(147, 128, 99, 0.24)"
+                    indicatorColor={contextIndicatorColor}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" align="end" sideOffset={10} className="rounded-2xl border border-border-soft bg-surface px-3 py-2 text-center text-xs text-txt-primary shadow-md">
                 <p>Context window</p>
-                <p className="font-medium">{contextUsage}% full</p>
+                <p className="font-medium">{contextUsage.percentage}% full</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -309,29 +344,4 @@ function basename(filePath: string) {
   const normalized = filePath.replace(/\\/g, "/");
   const parts = normalized.split("/").filter(Boolean);
   return parts[parts.length - 1] ?? filePath;
-}
-
-function ContextUsageRing({ value }: { value: number }) {
-  const clamped = Math.max(0, Math.min(100, value));
-  const radius = 5;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - clamped / 100);
-
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-      <circle cx="7" cy="7" r={radius} fill="none" stroke="currentColor" strokeOpacity="0.22" strokeWidth="1.6" />
-      <circle
-        cx="7"
-        cy="7"
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={strokeDashoffset}
-        transform="rotate(-90 7 7)"
-      />
-    </svg>
-  );
 }

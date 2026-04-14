@@ -31,12 +31,19 @@ describe("BuilderChatScreen", () => {
             responseSpeed: "normal",
             attachedFiles: [],
           }}
+          contextUsage={{
+            maxTokens: 24000,
+            percentage: 24,
+            usedTokens: 5800,
+          }}
           currentWorkspaceId={null}
           currentWorkspacePath={null}
           conversationTitle="New chat"
           conversationSubtitle="workspace"
           draft=""
           isNewChat={false}
+          prepareProgress={0}
+          isPreparingResponse={false}
           isStreaming
           messages={[
             {
@@ -67,5 +74,53 @@ describe("BuilderChatScreen", () => {
     expect(screen.queryByText("Medium")).not.toBeInTheDocument();
     expect(screen.getByText("Thinking")).toBeInTheDocument();
     expect(screen.queryByLabelText("Jump to latest message")).not.toBeInTheDocument();
+    expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a loader in the send button while preparing a response", () => {
+    render(
+      <TooltipProvider>
+        <BuilderChatScreen
+          activeConversationId={null}
+          composerSettings={{
+            permissionMode: "default",
+            planMode: false,
+            responseSpeed: "normal",
+            attachedFiles: [],
+          }}
+          contextUsage={{
+            maxTokens: 24000,
+            percentage: 0,
+            usedTokens: 0,
+          }}
+          currentWorkspaceId={null}
+          currentWorkspacePath={null}
+          conversationTitle="New chat"
+          conversationSubtitle="workspace"
+          draft="hello"
+          isNewChat
+          prepareProgress={56}
+          isPreparingResponse
+          isStreaming
+          messages={[]}
+          promptSuggestions={[]}
+          onArchiveConversation={vi.fn()}
+          onOpenWorkspaceInExplorer={vi.fn()}
+          onPermissionModeChange={vi.fn()}
+          onPickAttachment={vi.fn()}
+          onPlanModeChange={vi.fn()}
+          onRenameConversation={vi.fn()}
+          onDraftChange={vi.fn()}
+          onRemoveAttachment={vi.fn()}
+          onSend={vi.fn()}
+          onStopStreaming={vi.fn()}
+          onCreatePermanentWorktree={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    const button = screen.getByLabelText("Stop response");
+    expect(button.querySelector("svg")).not.toBeNull();
+    expect(screen.getByLabelText("Preparing response")).toBeInTheDocument();
   });
 });

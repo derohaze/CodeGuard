@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from collections.abc import AsyncIterator
 
@@ -7,6 +8,20 @@ import httpx
 
 from app.core.config import get_settings
 from app.core.exceptions import ExternalAIServiceError
+
+
+@dataclass(slots=True)
+class BuilderProviderUsage:
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+
+
+@dataclass(slots=True)
+class BuilderProviderReply:
+    text: str
+    model: str
+    usage: BuilderProviderUsage | None = None
 
 
 class RoutingRunBuilderProvider:
@@ -19,7 +34,7 @@ class RoutingRunBuilderProvider:
         self.temperature = settings.builder_chat_temperature
         self.max_tokens = settings.builder_chat_max_tokens
 
-    async def generate_reply(self, messages: list[dict[str, str]]) -> tuple[str, str]:
+    async def generate_reply(self, messages: list[dict[str, str]]) -> BuilderProviderReply:
         if not self.api_key:
             raise ExternalAIServiceError(
                 "Builder chat provider key is missing. Set BUILDER_CHAT_API_KEY in .env.",
@@ -97,9 +112,13 @@ class RoutingRunBuilderProvider:
             )
 
         model = str(body.get("model") or self.model)
-        return content, model
+        return BuilderProviderReply(
+            text=content,
+            model=model,
+            usage=_extract_usage_payload(body.get("usage")),
+        )
 
-    async def generate_reply_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[dict[str, str]]:
+    async def generate_reply_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[dict[str, object]]:
         if not self.api_key:
             raise ExternalAIServiceError(
                 "Builder chat provider key is missing. Set BUILDER_CHAT_API_KEY in .env.",
@@ -138,6 +157,14 @@ class RoutingRunBuilderProvider:
                         chunk = json.loads(data)
                         model = str(chunk.get("model") or self.model)
                         yield {"type": "meta", "model": model}
+                        usage = _extract_usage_payload(chunk.get("usage"))
+                        if usage is not None:
+                            yield {
+                                "type": "usage",
+                                "input_tokens": usage.input_tokens,
+                                "output_tokens": usage.output_tokens,
+                                "total_tokens": usage.total_tokens,
+                            }
 
                         choices = chunk.get("choices", [])
                         if not choices:
@@ -267,3 +294,47 @@ def _extract_error_message(response: httpx.Response) -> str:
         if isinstance(detail, str) and detail.strip():
             return detail.strip()
     return "Unknown provider error."
+
+
+def _extract_usage_payload(value: object) -> BuilderProviderUsage | None:
+    if not isinstance(value, dict):
+        return None
+
+    input_tokens = _coerce_usage_int(value.get("input_tokens"))
+    if input_tokens is None:
+        input_tokens = _coerce_usage_int(value.get("prompt_tokens"))
+
+    output_tokens = _coerce_usage_int(value.get("output_tokens"))
+    if output_tokens is None:
+        output_tokens = _coerce_usage_int(value.get("completion_tokens"))
+
+    total_tokens = _coerce_usage_int(value.get("total_tokens"))
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+
+    if input_tokens is None and output_tokens is None and total_tokens is None:
+        return None
+
+    return BuilderProviderUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+    )
+
+
+def _coerce_usage_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return max(value, 0)
+    if isinstance(value, float):
+        return max(int(value), 0)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return max(int(float(stripped)), 0)
+        except ValueError:
+            return None
+    return None

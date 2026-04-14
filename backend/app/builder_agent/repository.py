@@ -6,7 +6,9 @@ from uuid import uuid4
 from pymongo import ReturnDocument
 
 from app.infrastructure.database.collections import (
+    BUILDER_MEMORY_ITEMS_COLLECTION,
     BUILDER_MESSAGES_COLLECTION,
+    BUILDER_THREAD_CONTEXTS_COLLECTION,
     BUILDER_THREADS_COLLECTION,
     BUILDER_WORKSPACES_COLLECTION,
 )
@@ -19,6 +21,8 @@ class BuilderAgentRepository:
         self.workspaces = database[BUILDER_WORKSPACES_COLLECTION]
         self.threads = database[BUILDER_THREADS_COLLECTION]
         self.messages = database[BUILDER_MESSAGES_COLLECTION]
+        self.thread_contexts = database[BUILDER_THREAD_CONTEXTS_COLLECTION]
+        self.memory_items = database[BUILDER_MEMORY_ITEMS_COLLECTION]
 
     async def list_workspaces(self) -> list[dict]:
         workspace_docs = await self.workspaces.find({"archived": {"$ne": True}}).sort("updated_at", -1).to_list(length=500)
@@ -254,6 +258,98 @@ class BuilderAgentRepository:
         rows = await self.messages.find({"thread_id": thread_id}).sort("created_at", -1).limit(limit).to_list(length=limit)
         rows.reverse()
         return rows
+
+    async def list_messages(self, thread_id: str) -> list[dict]:
+        return await self.messages.find({"thread_id": thread_id}).sort("created_at", 1).to_list(length=10000)
+
+    async def get_thread_context(self, thread_id: str) -> dict | None:
+        return await self.thread_contexts.find_one({"thread_id": thread_id})
+
+    async def upsert_thread_context(
+        self,
+        *,
+        thread_id: str,
+        workspace_id: str,
+        rolling_summary: str,
+        used_tokens: int,
+        max_tokens: int,
+        percentage: int,
+        recent_message_count: int,
+        memory_count: int,
+        last_message_at: datetime | None,
+        usage_source: str = "estimated",
+        provider_input_tokens: int | None = None,
+        provider_output_tokens: int | None = None,
+        provider_total_tokens: int | None = None,
+    ) -> dict:
+        now = datetime.now(UTC)
+        return await self.thread_contexts.find_one_and_update(
+            {"thread_id": thread_id},
+            {
+                "$set": {
+                    "workspace_id": workspace_id,
+                    "rolling_summary": rolling_summary,
+                    "used_tokens": used_tokens,
+                    "max_tokens": max_tokens,
+                    "percentage": percentage,
+                    "recent_message_count": recent_message_count,
+                    "memory_count": memory_count,
+                    "last_message_at": last_message_at,
+                    "usage_source": usage_source,
+                    "provider_input_tokens": provider_input_tokens,
+                    "provider_output_tokens": provider_output_tokens,
+                    "provider_total_tokens": provider_total_tokens,
+                    "updated_at": now,
+                },
+                "$setOnInsert": {
+                    "created_at": now,
+                },
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+
+    async def list_memory_items(self, workspace_id: str, *, limit: int = 100) -> list[dict]:
+        return await self.memory_items.find({"workspace_id": workspace_id}).sort("updated_at", -1).limit(limit).to_list(length=limit)
+
+    async def upsert_memory_item(
+        self,
+        *,
+        workspace_id: str,
+        thread_id: str,
+        memory_class: str,
+        title: str,
+        content: str,
+        source_message_id: str,
+        content_fingerprint: str,
+        tags: list[str],
+    ) -> dict:
+        now = datetime.now(UTC)
+        memory_id = str(uuid4())
+        return await self.memory_items.find_one_and_update(
+            {
+                "workspace_id": workspace_id,
+                "content_fingerprint": content_fingerprint,
+            },
+            {
+                "$set": {
+                    "thread_id": thread_id,
+                    "memory_class": memory_class,
+                    "title": title,
+                    "content": content,
+                    "source_message_id": source_message_id,
+                    "tags": tags,
+                    "updated_at": now,
+                },
+                "$setOnInsert": {
+                    "memory_id": memory_id,
+                    "workspace_id": workspace_id,
+                    "created_at": now,
+                },
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
 
     async def get_thread_detail(self, thread_id: str) -> dict | None:
         thread = await self.get_thread(thread_id)

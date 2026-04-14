@@ -9,7 +9,8 @@ const DESCRIPTION_ENTRY_REGEX = /^\s*([^:\n]{1,80}):\s+(.+)\s*$/;
 const TABLE_SEPARATOR_REGEX = /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/;
 
 export function parseBuilderMessage(text: string): BuilderMessageBlock[] {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const normalizedText = normalizeBuilderMessageText(text);
+  const lines = normalizedText.replace(/\r\n/g, "\n").split("\n");
   const blocks: BuilderMessageBlock[] = [];
   let index = 0;
 
@@ -34,7 +35,13 @@ export function parseBuilderMessage(text: string): BuilderMessageBlock[] {
       if (index < lines.length) {
         index += 1;
       }
-      blocks.push({ type: "code", code: codeLines.join("\n"), language });
+      const codeText = codeLines.join("\n");
+      const fencedStructuredBlocks = language ? [] : parseStructuredFenceContent(codeText);
+      if (fencedStructuredBlocks.length > 0) {
+        blocks.push(...fencedStructuredBlocks);
+      } else {
+        blocks.push({ type: "code", code: codeText, language });
+      }
       continue;
     }
 
@@ -125,6 +132,14 @@ export function parseBuilderMessage(text: string): BuilderMessageBlock[] {
   return blocks;
 }
 
+function normalizeBuilderMessageText(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t");
+}
+
 function collectDescriptionEntries(lines: string[], startIndex: number): BuilderDescriptionListEntry[] {
   const entries: BuilderDescriptionListEntry[] = [];
   let index = startIndex;
@@ -196,4 +211,25 @@ function splitTableRow(line: string): string[] {
     .split("|")
     .map((cell) => cell.trim())
     .filter((cell) => cell.length > 0);
+}
+
+function parseStructuredFenceContent(codeText: string): BuilderMessageBlock[] {
+  const trimmed = codeText.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const structuredSignalRegex =
+    /(^#{1,6}\s)|(^\s*\d+\.\s+)|(^\s*[-*+]\s+)|(^\|.+\|$)|(^\s*[^:\n]{1,80}:\s+.+$)/m;
+  if (!structuredSignalRegex.test(trimmed)) {
+    return [];
+  }
+
+  const nestedBlocks = parseBuilderMessage(trimmed).filter((block) => block.type !== "code");
+  if (nestedBlocks.length === 0) {
+    return [];
+  }
+
+  const hasStructuredBlock = nestedBlocks.some((block) => block.type !== "paragraph");
+  return hasStructuredBlock ? nestedBlocks : [];
 }

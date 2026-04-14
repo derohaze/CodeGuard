@@ -2,11 +2,11 @@ import type { BuilderThreadDto, BuilderWorkspaceDto } from "../builderApi";
 import type { BuilderMessage, BuilderThreadGroup } from "../mockBuilderAgent";
 
 export function formatRelativeTime(isoValue: string): string {
-  const parsed = new Date(isoValue);
+  const parsed = parseBuilderTimestamp(isoValue);
   if (Number.isNaN(parsed.getTime())) {
     return "now";
   }
-  const diffMs = Date.now() - parsed.getTime();
+  const diffMs = Math.max(0, Date.now() - parsed.getTime());
   if (diffMs <= 60_000) return "now";
   const minutes = Math.floor(diffMs / 60_000);
   if (minutes < 60) return `${minutes}m`;
@@ -16,6 +16,16 @@ export function formatRelativeTime(isoValue: string): string {
   if (days < 30) return `${days}d`;
   const months = Math.floor(days / 30);
   return `${Math.max(months, 1)}mo`;
+}
+
+function parseBuilderTimestamp(value: string): Date {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return new Date(Number.NaN);
+  }
+
+  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:\d{2})$/u.test(trimmed);
+  return new Date(hasExplicitTimezone ? trimmed : `${trimmed}Z`);
 }
 
 export function mapMessage(message: BuilderThreadDto["messages"][number]): BuilderMessage {

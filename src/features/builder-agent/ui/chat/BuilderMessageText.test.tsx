@@ -45,6 +45,29 @@ describe("BuilderMessageText", () => {
 
     expect(screen.getByText("Show code")).toBeInTheDocument();
     expect(screen.getByText("python")).toBeInTheDocument();
+    const codeElement = document.querySelector("pre code");
+    expect(codeElement).not.toBeNull();
+    expect(codeElement?.className).toContain("bg-transparent");
+  });
+
+  it("renders fenced markdown tables as structured content when no code language is provided", () => {
+    render(
+      <BuilderMessageText
+        isStreaming={false}
+        text={[
+          "```",
+          "| Organization | Focus |",
+          "| --- | --- |",
+          "| ISO | General standards |",
+          "| OECD | Economic cooperation |",
+          "```",
+        ].join("\n")}
+      />,
+    );
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByText("code")).not.toBeInTheDocument();
+    expect(screen.getByText("General standards")).toBeInTheDocument();
   });
 
   it("supports inverted tone for user bubbles", () => {
@@ -59,5 +82,17 @@ describe("BuilderMessageText", () => {
     const text = screen.getByText("Client message");
     expect(text).toBeInTheDocument();
     expect(text.className).toContain("text-white");
+  });
+
+  it("normalizes escaped newlines before structured rendering", () => {
+    render(
+      <BuilderMessageText
+        isStreaming={false}
+        text={"## Title\\n\\nSecond paragraph"}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Title" })).toBeInTheDocument();
+    expect(screen.getByText("Second paragraph")).toBeInTheDocument();
   });
 });

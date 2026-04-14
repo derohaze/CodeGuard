@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { BuilderComposer } from "./BuilderComposer";
 import { BuilderConversationView } from "./BuilderConversationView";
@@ -8,12 +8,15 @@ import type { BuilderChatScreenProps } from "./types";
 export function BuilderChatScreen({
   activeConversationId,
   composerSettings,
+  contextUsage,
   currentWorkspaceId,
   currentWorkspacePath,
   conversationTitle,
   conversationSubtitle,
   draft,
   isNewChat,
+  prepareProgress,
+  isPreparingResponse,
   isStreaming,
   messages,
   promptSuggestions,
@@ -30,11 +33,28 @@ export function BuilderChatScreen({
   onCreatePermanentWorktree,
 }: BuilderChatScreenProps) {
   const scrollToLatestRef = useRef<(() => void) | null>(null);
+  const pendingScrollFrameRef = useRef<number | null>(null);
 
   const handleSendRequest = useCallback(() => {
     scrollToLatestRef.current?.();
     onSend();
+    if (pendingScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingScrollFrameRef.current);
+    }
+    pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
+      pendingScrollFrameRef.current = window.requestAnimationFrame(() => {
+        scrollToLatestRef.current?.();
+        pendingScrollFrameRef.current = null;
+      });
+    });
   }, [onSend]);
+
+  useEffect(() => () => {
+    if (pendingScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingScrollFrameRef.current);
+      pendingScrollFrameRef.current = null;
+    }
+  }, []);
 
   return (
     <motion.div
@@ -65,7 +85,10 @@ export function BuilderChatScreen({
 
       <BuilderComposer
         composerSettings={composerSettings}
+        contextUsage={contextUsage}
         draft={draft}
+        prepareProgress={prepareProgress}
+        isPreparingResponse={isPreparingResponse}
         isStreaming={isStreaming}
         onDraftChange={onDraftChange}
         onPermissionModeChange={onPermissionModeChange}

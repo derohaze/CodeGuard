@@ -147,6 +147,7 @@ export default function Page() {
     busyConversationIds,
     collapseAllWorkspaces,
     composerSettings,
+    contextUsage,
     createPermanentWorktree,
     createWorkspaceThread,
     currentWorkspace,
@@ -154,6 +155,8 @@ export default function Page() {
     expandedWorkspaceIds,
     expandAllWorkspaces,
     hasPreviousConversation,
+    prepareProgress,
+    isPreparingResponse,
     isStreaming,
     messages,
     openConversation,
@@ -1328,12 +1331,15 @@ export default function Page() {
                   <BuilderChatScreen
                     activeConversationId={activeConversationId}
                     composerSettings={composerSettings}
+                    contextUsage={contextUsage}
                     currentWorkspaceId={currentWorkspace?.id ?? null}
                     currentWorkspacePath={currentWorkspace?.path ?? null}
                     conversationTitle={activeConversation?.title ?? "New chat"}
                     conversationSubtitle={activeConversation?.subtitle ?? (currentWorkspace?.label ?? "Choose a workspace")}
                     draft={draft}
                     isNewChat={activeConversationId === null}
+                    prepareProgress={prepareProgress}
+                    isPreparingResponse={isPreparingResponse}
                     isStreaming={isStreaming}
                     messages={messages}
                     promptSuggestions={promptSuggestions}

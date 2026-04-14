@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Loader } from "@/shared/ui/Loader";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ShowMore } from "@/components/ui/show-more";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -401,13 +402,13 @@ export function BuilderSidebar({
                             return (
                               <div key={thread.id} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors ${active ? "bg-card" : "hover:bg-card/70"}`}>
                                 <button onClick={() => onOpenConversation(thread.id)} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
-                                  <AnimatedThreadTitle title={thread.title} />
-                                  {busy ? (
-                                    <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-[#a76924]">
-                                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                                      <span>Working</span>
-                                    </span>
-                                  ) : (
+                                    <AnimatedThreadTitle title={thread.title} />
+                                    {busy ? (
+                                      <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-[#a76924]">
+                                        <Loader variant="spin" className="size-3 text-current" aria-hidden="true" />
+                                        <span>Working</span>
+                                      </span>
+                                    ) : (
                                     <span className="shrink-0 text-xs text-txt-tertiary">{thread.updatedAt}</span>
                                   )}
                                 </button>

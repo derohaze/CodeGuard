@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     builder_chat_temperature: float = Field(default=0.2, ge=0.0, le=2.0, alias="BUILDER_CHAT_TEMPERATURE")
     builder_chat_max_tokens: int = Field(default=1200, ge=128, le=8192, alias="BUILDER_CHAT_MAX_TOKENS")
     builder_chat_max_history_messages: int = Field(default=20, ge=4, le=100, alias="BUILDER_CHAT_MAX_HISTORY_MESSAGES")
+    builder_chat_context_token_budget: int = Field(default=24000, ge=2048, le=200000, alias="BUILDER_CHAT_CONTEXT_TOKEN_BUDGET")
+    builder_chat_summary_window_messages: int = Field(default=10, ge=4, le=40, alias="BUILDER_CHAT_SUMMARY_WINDOW_MESSAGES")
+    builder_chat_max_memory_items: int = Field(default=6, ge=1, le=24, alias="BUILDER_CHAT_MAX_MEMORY_ITEMS")
 
     mongodb_uri: str = Field(alias="MONGODB_URI")
     mongodb_fallback_uri: str | None = Field(default=None, alias="MONGODB_FALLBACK_URI")

@@ -16,11 +16,13 @@ import {
   type BuilderMessage,
   type BuilderThreadGroup,
 } from "../mockBuilderAgent";
+import type { BuilderContextState } from "../lib/context-window";
 import { mapMessage, mapWorkspace } from "../lib/mappers";
 
 export function useBuilderWorkspaceState() {
   const [threadGroups, setThreadGroups] = useState<BuilderThreadGroup[]>([]);
   const [messageMap, setMessageMap] = useState<Record<string, BuilderMessage[]>>({});
+  const [contextStateMap, setContextStateMap] = useState<Record<string, BuilderContextState | null>>({});
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
@@ -120,6 +122,10 @@ export function useBuilderWorkspaceState() {
         ...current,
         [conversationId]: detail.messages.map(mapMessage),
       }));
+      setContextStateMap((current) => ({
+        ...current,
+        [conversationId]: detail.contextState ?? null,
+      }));
       setActiveConversationId(conversationId);
     } catch (error) {
       if (pendingConversationOpenRef.current === conversationId) {
@@ -176,8 +182,7 @@ export function useBuilderWorkspaceState() {
 
   const addWorkspace = useCallback(() => {
     void (async () => {
-      const canBrowse = typeof window !== "undefined" && typeof window.electronAPI?.pickPath === "function";
-      const picked = canBrowse ? await window.electronAPI?.pickPath?.("folder") : window.prompt("Project folder path")?.trim() ?? null;
+      const picked = await pickWorkspacePath();
       if (!picked) return;
       const normalizedPath = picked.trim();
       if (!normalizedPath) return;
@@ -223,6 +228,13 @@ export function useBuilderWorkspaceState() {
           }
           return next;
         });
+        setContextStateMap((current) => {
+          const next = { ...current };
+          for (const threadId of threadIds) {
+            delete next[threadId];
+          }
+          return next;
+        });
         if (activeConversationId && threadIds.includes(activeConversationId)) {
           setActiveConversationId(null);
           setDraft("");
@@ -241,6 +253,13 @@ export function useBuilderWorkspaceState() {
         const threadIds = workspace ? workspace.threads.map((thread) => thread.id) : [];
         await deleteBuilderWorkspace(workspaceId);
         setMessageMap((current) => {
+          const next = { ...current };
+          for (const threadId of threadIds) {
+            delete next[threadId];
+          }
+          return next;
+        });
+        setContextStateMap((current) => {
           const next = { ...current };
           for (const threadId of threadIds) {
             delete next[threadId];
@@ -289,6 +308,10 @@ export function useBuilderWorkspaceState() {
           ...current,
           [detail.id]: detail.messages.map(mapMessage),
         }));
+        setContextStateMap((current) => ({
+          ...current,
+          [detail.id]: detail.contextState ?? null,
+        }));
         setDraft("");
         await refreshWorkspaces();
       } catch (error) {
@@ -319,6 +342,10 @@ export function useBuilderWorkspaceState() {
           ...current,
           [detail.id]: detail.messages.map(mapMessage),
         }));
+        setContextStateMap((current) => ({
+          ...current,
+          [detail.id]: detail.contextState ?? null,
+        }));
         await refreshWorkspaces();
       } catch (error) {
         console.error("[CodeGuard Builder] Failed to rename thread", error);
@@ -331,6 +358,11 @@ export function useBuilderWorkspaceState() {
       try {
         await deleteBuilderThread(threadId);
         setMessageMap((current) => {
+          const next = { ...current };
+          delete next[threadId];
+          return next;
+        });
+        setContextStateMap((current) => {
           const next = { ...current };
           delete next[threadId];
           return next;
@@ -355,6 +387,11 @@ export function useBuilderWorkspaceState() {
           delete next[threadId];
           return next;
         });
+        setContextStateMap((current) => {
+          const next = { ...current };
+          delete next[threadId];
+          return next;
+        });
         if (activeConversationId === threadId) {
           setActiveConversationId(null);
           setDraft("");
@@ -367,6 +404,7 @@ export function useBuilderWorkspaceState() {
   }, [activeConversationId, refreshWorkspaces]);
 
   return {
+    addWorkspace,
     activeConversation,
     activeConversationId,
     archiveThread,
@@ -377,6 +415,7 @@ export function useBuilderWorkspaceState() {
     createWorkspaceThread,
     currentWorkspace,
     currentWorkspaceId,
+    contextStateMap,
     draft,
     expandedWorkspaceIds,
     expandAllWorkspaces,
@@ -396,6 +435,7 @@ export function useBuilderWorkspaceState() {
     setActiveConversationId,
     setCurrentWorkspaceId,
     setDraft,
+    setContextStateMap,
     setExpandedWorkspaceIds,
     setMessageMap,
     setShowAllWorkspaceIds,
@@ -408,4 +448,26 @@ export function useBuilderWorkspaceState() {
     toggleWorkspace,
     toggleWorkspaceShowAll,
   };
+}
+
+async function pickWorkspacePath(): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (typeof window.electronAPI?.pickPath === "function") {
+    try {
+      const picked = await window.electronAPI.pickPath("folder");
+      const normalized = typeof picked === "string" ? picked.trim() : "";
+      if (normalized) {
+        return normalized;
+      }
+      return null;
+    } catch (error) {
+      console.error("[CodeGuard Builder] Native folder picker failed", error);
+    }
+  }
+
+  const manualPath = window.prompt("Project folder path")?.trim() ?? null;
+  return manualPath && manualPath.trim() ? manualPath.trim() : null;
 }

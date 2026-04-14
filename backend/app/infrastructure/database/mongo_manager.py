@@ -10,7 +10,9 @@ from app.infrastructure.database.collections import (
     BENCHMARK_CASES_COLLECTION,
     BENCHMARK_RUNS_COLLECTION,
     BENCHMARK_SUITES_COLLECTION,
+    BUILDER_MEMORY_ITEMS_COLLECTION,
     BUILDER_MESSAGES_COLLECTION,
+    BUILDER_THREAD_CONTEXTS_COLLECTION,
     BUILDER_THREADS_COLLECTION,
     BUILDER_WORKSPACES_COLLECTION,
     EXTERNAL_KNOWLEDGE_CHUNKS_COLLECTION,
@@ -213,6 +215,29 @@ async def ensure_mongo_indexes() -> None:
     await builder_messages.create_index([("message_id", 1)], name="ux_builder_messages_message_id", unique=True)
     await builder_messages.create_index([("thread_id", 1), ("created_at", 1)], name="idx_builder_messages_thread_created_at_asc")
     await builder_messages.create_index([("workspace_id", 1), ("created_at", DESCENDING)], name="idx_builder_messages_workspace_created_at_desc")
+
+    builder_thread_contexts = database[BUILDER_THREAD_CONTEXTS_COLLECTION]
+    await builder_thread_contexts.create_index([("thread_id", 1)], name="ux_builder_thread_contexts_thread_id", unique=True)
+    await builder_thread_contexts.create_index(
+        [("workspace_id", 1), ("updated_at", DESCENDING)],
+        name="idx_builder_thread_contexts_workspace_updated_at_desc",
+    )
+
+    builder_memory_items = database[BUILDER_MEMORY_ITEMS_COLLECTION]
+    await builder_memory_items.create_index([("memory_id", 1)], name="ux_builder_memory_items_memory_id", unique=True)
+    await builder_memory_items.create_index(
+        [("workspace_id", 1), ("content_fingerprint", 1)],
+        name="ux_builder_memory_items_workspace_fingerprint",
+        unique=True,
+    )
+    await builder_memory_items.create_index(
+        [("thread_id", 1), ("updated_at", DESCENDING)],
+        name="idx_builder_memory_items_thread_updated_at_desc",
+    )
+    await builder_memory_items.create_index(
+        [("workspace_id", 1), ("memory_class", 1), ("updated_at", DESCENDING)],
+        name="idx_builder_memory_items_workspace_class_updated_at_desc",
+    )
 
 
 def ensure_artifacts_directory() -> Path:

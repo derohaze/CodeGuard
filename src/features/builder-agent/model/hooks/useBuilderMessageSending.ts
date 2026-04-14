@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  createBuilderThread,
   sendBuilderMessage,
   sendBuilderMessageStream,
 } from "../builderApi";
 import type { BuilderMessage } from "../mockBuilderAgent";
+import type { BuilderContextState } from "../lib/context-window";
 import type { BuilderComposerSettings } from "../lib/types";
 import { mapMessage } from "../lib/mappers";
 import {
@@ -14,6 +14,9 @@ import {
   splitStreamDisplayUnits,
 } from "../lib/streaming";
 
+const PREPARE_RESPONSE_DURATION_MS = 240;
+const PREPARE_RESPONSE_TICK_MS = 16;
+
 interface UseBuilderMessageSendingParams {
   activeConversationId: string | null;
   composerSettings: BuilderComposerSettings;
@@ -22,6 +25,7 @@ interface UseBuilderMessageSendingParams {
   draft: string;
   refreshWorkspaces: () => Promise<void>;
   setActiveConversationId: Dispatch<SetStateAction<string | null>>;
+  setContextStateMap: Dispatch<SetStateAction<Record<string, BuilderContextState | null>>>;
   setCurrentWorkspaceId: Dispatch<SetStateAction<string | null>>;
   setDraft: Dispatch<SetStateAction<string>>;
   setMessageMap: Dispatch<SetStateAction<Record<string, BuilderMessage[]>>>;
@@ -34,11 +38,14 @@ export function useBuilderMessageSending({
   draft,
   refreshWorkspaces,
   setActiveConversationId,
+  setContextStateMap,
   setCurrentWorkspaceId,
   setDraft,
   setMessageMap,
 }: UseBuilderMessageSendingParams) {
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isPreparingResponse, setIsPreparingResponse] = useState(false);
+  const [prepareProgress, setPrepareProgress] = useState(0);
   const activeSendAbortRef = useRef<AbortController | null>(null);
   const activeStreamThreadIdRef = useRef<string | null>(null);
   const activeStreamAssistantIdRef = useRef<string | null>(null);
@@ -100,6 +107,8 @@ export function useBuilderMessageSending({
     streamUnitsRef.current = [];
     streamRevealBudgetRef.current = 0;
     streamLastDrainAtRef.current = null;
+    setIsPreparingResponse(false);
+    setPrepareProgress(0);
     markActiveAssistantStopped();
     if (streamDrainResolverRef.current) {
       streamDrainResolverRef.current();
@@ -127,23 +136,11 @@ export function useBuilderMessageSending({
       const prompt = draft.trim();
       if (!prompt || !currentWorkspace) return;
 
-      let threadId = activeConversationId;
-      if (!threadId) {
-        try {
-          const created = await createBuilderThread(currentWorkspace.id);
-          threadId = created.id;
-          setActiveConversationId(created.id);
-          setCurrentWorkspaceId(created.workspaceId);
-          setMessageMap((current) => ({
-            ...current,
-            [created.id]: created.messages.map(mapMessage),
-          }));
-        } catch (error) {
-          console.error("[CodeGuard Builder] Failed to bootstrap chat thread", error);
-          return;
-        }
-      }
-      if (!threadId) return;
+      const requestThreadId = activeConversationId;
+      const startedInNewChat = !requestThreadId;
+      const tempThreadId = startedInNewChat ? `local-thread-${Date.now()}` : null;
+      let renderThreadId = requestThreadId ?? tempThreadId;
+      if (!renderThreadId) return;
 
       const optimisticUserMessage: BuilderMessage = {
         id: `local-user-${Date.now()}`,
@@ -151,26 +148,12 @@ export function useBuilderMessageSending({
         text: prompt,
       };
       const optimisticAssistantId = `local-assistant-${Date.now() + 1}`;
-      setMessageMap((current) => ({
-        ...current,
-        [threadId!]: [
-          ...(current[threadId!] ?? []),
-          optimisticUserMessage,
-          {
-            id: optimisticAssistantId,
-            role: "assistant",
-            text: "",
-            isStreaming: true,
-          },
-        ],
-      }));
-      setDraft("");
-
       const abortController = new AbortController();
       activeSendAbortRef.current = abortController;
-      activeStreamThreadIdRef.current = threadId;
+      activeStreamThreadIdRef.current = renderThreadId;
       activeStreamAssistantIdRef.current = optimisticAssistantId;
-      setIsStreaming(true);
+      setIsPreparingResponse(true);
+      setPrepareProgress(0);
       streamUnitsRef.current = [];
       streamVisibleTextRef.current = "";
       streamSourceCompletedRef.current = false;
@@ -179,20 +162,109 @@ export function useBuilderMessageSending({
       streamLastDrainAtRef.current = null;
 
       try {
+        await new Promise<void>((resolve) => {
+          const startedAt = Date.now();
+          const timer = window.setInterval(() => {
+            if (abortController.signal.aborted || activeSendAbortRef.current !== abortController) {
+              window.clearInterval(timer);
+              resolve();
+              return;
+            }
+
+            const elapsed = Date.now() - startedAt;
+            const nextProgress = Math.min(100, Math.round((elapsed / PREPARE_RESPONSE_DURATION_MS) * 100));
+            setPrepareProgress(nextProgress);
+
+            if (elapsed >= PREPARE_RESPONSE_DURATION_MS) {
+              window.clearInterval(timer);
+              setPrepareProgress(100);
+              resolve();
+            }
+          }, PREPARE_RESPONSE_TICK_MS);
+        });
+
+        if (abortController.signal.aborted || activeSendAbortRef.current !== abortController) {
+          return;
+        }
+
+        setMessageMap((current) => ({
+          ...current,
+          [renderThreadId!]: [
+            ...(current[renderThreadId!] ?? []),
+            optimisticUserMessage,
+            {
+              id: optimisticAssistantId,
+              role: "assistant",
+              text: "",
+              isStreaming: true,
+            },
+          ],
+        }));
+        if (startedInNewChat) {
+          setActiveConversationId(renderThreadId);
+          setCurrentWorkspaceId(currentWorkspace.id);
+          setContextStateMap((current) => ({
+            ...current,
+            [renderThreadId!]: null,
+          }));
+        }
+        setDraft("");
+        setIsPreparingResponse(false);
+        setPrepareProgress(0);
+        setIsStreaming(true);
+
         const payload = {
           workspaceId: currentWorkspace.id,
-          threadId,
+          threadId: requestThreadId,
           message: prompt,
           permissionMode: composerSettings.permissionMode,
           planMode: composerSettings.planMode,
           responseSpeed: composerSettings.responseSpeed,
         } as const;
 
+        const moveOptimisticThread = (
+          nextThreadId: string,
+          nextWorkspaceId: string,
+          contextState: BuilderContextState | null,
+        ) => {
+          const previousThreadId = renderThreadId;
+          renderThreadId = nextThreadId;
+          activeStreamThreadIdRef.current = nextThreadId;
+
+          setMessageMap((current) => {
+            if (previousThreadId === nextThreadId) {
+              return current;
+            }
+            const next = { ...current };
+            const previousMessages = next[previousThreadId];
+            if (previousMessages) {
+              next[nextThreadId] = previousMessages;
+              delete next[previousThreadId];
+            }
+            return next;
+          });
+          setContextStateMap((current) => {
+            if (previousThreadId === nextThreadId) {
+              return {
+                ...current,
+                [nextThreadId]: contextState,
+              };
+            }
+            const next = { ...current };
+            const previousContext = next[previousThreadId] ?? null;
+            next[nextThreadId] = contextState ?? previousContext;
+            delete next[previousThreadId];
+            return next;
+          });
+          setActiveConversationId(nextThreadId);
+          setCurrentWorkspaceId(nextWorkspaceId);
+        };
+
         const pushVisibleText = (nextText: string) => {
           streamVisibleTextRef.current = nextText;
           setMessageMap((current) => ({
             ...current,
-            [threadId!]: (current[threadId!] ?? []).map((item) => (
+            [renderThreadId!]: (current[renderThreadId!] ?? []).map((item) => (
               item.id === optimisticAssistantId
                 ? { ...item, text: nextText }
                 : item
@@ -346,10 +418,25 @@ export function useBuilderMessageSending({
         let result = await sendBuilderMessageStream(
           payload,
           {
+            onAck: ({ threadId: acknowledgedThreadId, workspaceId, contextState }) => {
+              setIsPreparingResponse(false);
+              if (startedInNewChat) {
+                moveOptimisticThread(acknowledgedThreadId, workspaceId, contextState);
+              }
+            },
             onToken: (token) => {
+              setIsPreparingResponse(false);
               enqueueToken(token);
             },
+            onContextState: (contextState) => {
+              setIsPreparingResponse(false);
+              setContextStateMap((current) => ({
+                ...current,
+                [renderThreadId!]: contextState,
+              }));
+            },
             onReasoning: () => {
+              setIsPreparingResponse(false);
               // Builder chat should stream only the visible assistant answer.
             },
           },
@@ -360,11 +447,25 @@ export function useBuilderMessageSending({
         if (!result) {
           result = await sendBuilderMessage(payload, abortController.signal);
         }
+        setIsPreparingResponse(false);
+        setPrepareProgress(0);
 
-        setMessageMap((current) => ({
-          ...current,
-          [result.thread.id]: result.thread.messages.map(mapMessage),
-        }));
+        setMessageMap((current) => {
+          const next = { ...current };
+          if (renderThreadId !== result.thread.id) {
+            delete next[renderThreadId!];
+          }
+          next[result.thread.id] = result.thread.messages.map(mapMessage);
+          return next;
+        });
+        setContextStateMap((current) => {
+          const next = { ...current };
+          if (renderThreadId !== result.thread.id) {
+            delete next[renderThreadId!];
+          }
+          next[result.thread.id] = result.thread.contextState ?? null;
+          return next;
+        });
         setActiveConversationId(result.thread.id);
         setCurrentWorkspaceId(result.thread.workspaceId);
         await refreshWorkspaces();
@@ -376,7 +477,7 @@ export function useBuilderMessageSending({
           const result = await sendBuilderMessage(
             {
               workspaceId: currentWorkspace.id,
-              threadId,
+              threadId: requestThreadId,
               message: prompt,
               permissionMode: composerSettings.permissionMode,
               planMode: composerSettings.planMode,
@@ -384,14 +485,44 @@ export function useBuilderMessageSending({
             },
             abortController.signal,
           );
-          setMessageMap((current) => ({
-            ...current,
-            [result.thread.id]: result.thread.messages.map(mapMessage),
-          }));
+          setIsPreparingResponse(false);
+          setPrepareProgress(0);
+          setMessageMap((current) => {
+            const next = { ...current };
+            if (startedInNewChat && tempThreadId) {
+              delete next[tempThreadId];
+            }
+            next[result.thread.id] = result.thread.messages.map(mapMessage);
+            return next;
+          });
+          setContextStateMap((current) => {
+            const next = { ...current };
+            if (startedInNewChat && tempThreadId) {
+              delete next[tempThreadId];
+            }
+            next[result.thread.id] = result.thread.contextState ?? null;
+            return next;
+          });
           setActiveConversationId(result.thread.id);
           setCurrentWorkspaceId(result.thread.workspaceId);
           await refreshWorkspaces();
         } catch (fallbackError) {
+          setIsPreparingResponse(false);
+          setPrepareProgress(0);
+          if (startedInNewChat && tempThreadId) {
+            setMessageMap((current) => {
+              const next = { ...current };
+              delete next[tempThreadId];
+              return next;
+            });
+            setContextStateMap((current) => {
+              const next = { ...current };
+              delete next[tempThreadId];
+              return next;
+            });
+            setActiveConversationId(null);
+          }
+          setDraft(prompt);
           console.error("[CodeGuard Builder] Failed to send message", fallbackError ?? error);
         }
       } finally {
@@ -412,10 +543,10 @@ export function useBuilderMessageSending({
           streamDrainResolverRef.current();
           streamDrainResolverRef.current = null;
         }
-        markAssistantStopped(threadId, optimisticAssistantId);
+        markAssistantStopped(renderThreadId, optimisticAssistantId);
         streamVisibleTextRef.current = "";
         if (
-          activeStreamThreadIdRef.current === threadId &&
+          activeStreamThreadIdRef.current === renderThreadId &&
           activeStreamAssistantIdRef.current === optimisticAssistantId
         ) {
           activeStreamThreadIdRef.current = null;
@@ -423,6 +554,8 @@ export function useBuilderMessageSending({
         }
         if (activeSendAbortRef.current === abortController) {
           activeSendAbortRef.current = null;
+          setIsPreparingResponse(false);
+          setPrepareProgress(0);
           setIsStreaming(false);
         }
       }
@@ -437,12 +570,15 @@ export function useBuilderMessageSending({
     markAssistantStopped,
     refreshWorkspaces,
     setActiveConversationId,
+    setContextStateMap,
     setCurrentWorkspaceId,
     setDraft,
     setMessageMap,
   ]);
 
   return {
+    prepareProgress,
+    isPreparingResponse,
     isStreaming,
     sendMessage,
     stopStreaming,

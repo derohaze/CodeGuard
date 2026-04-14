@@ -69,7 +69,7 @@ export function Loader({ variant = "spin", className, ...props }: LoaderProps) {
       className={twMerge(
         "size-4",
         variant === "ring" && "animate-spin",
-        variant === "spin" && "animate-spin stroke-current [animation-duration:0.75s] [animation-timing-function:linear]",
+        variant === "spin" && "animate-spin stroke-current [animation-duration:0.83333s] [animation-timing-function:linear]",
         className,
       )}
       {...props}
