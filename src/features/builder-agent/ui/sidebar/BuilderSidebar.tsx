@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, Reorder, motion } from "framer-motion";
+import { AnimatePresence, Reorder } from "framer-motion";
 import {
   Check,
   ChevronDown,
@@ -160,16 +160,13 @@ export function BuilderSidebar({
     .filter((group): group is BuilderThreadGroup => group !== null);
 
   return (
-    <motion.aside
-      initial={false}
-      animate={{
+    <aside
+      className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar"
+      style={{
+        borderColor: "hsl(var(--border-primary))",
         width: isCollapsed ? 0 : 300,
         opacity: isCollapsed ? 0 : 1,
-        x: isCollapsed ? -20 : 0,
       }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar"
-      style={{ borderColor: "hsl(var(--border-primary))" }}
       aria-hidden={isCollapsed}
     >
       <div className="px-5 pb-2 pt-5">
@@ -197,12 +194,7 @@ export function BuilderSidebar({
 
       <BuilderSidebarSearchButton onOpen={() => setIsCommandMenuOpen(true)} />
 
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-        className="flex items-center justify-between px-5 pb-2 pt-5"
-      >
+      <div className="flex items-center justify-between px-5 pb-2 pt-5">
         <span className="text-xs font-medium text-txt-tertiary">Threads</span>
         <div className="flex items-center gap-1">
           <Tooltip delayDuration={0}>
@@ -287,14 +279,9 @@ export function BuilderSidebar({
             </TooltipContent>
           </Tooltip>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1], delay: 0.24 }}
-        className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4"
-      >
+      <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <Reorder.Group axis="y" values={orderedWorkspaceIds} onReorder={(nextOrder) => {
           setOrderedWorkspaceIds(nextOrder);
           onReorderWorkspaces(nextOrder);
@@ -311,15 +298,8 @@ export function BuilderSidebar({
               <Reorder.Item
                 key={group.id}
                 value={group.id}
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
                 whileDrag={{ scale: 1.015, boxShadow: "0 14px 28px rgba(52,42,28,0.12)" }}
-                transition={{
-                  layout: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
-                  duration: 0.22,
-                  ease: [0.22, 1, 0.36, 1],
-                  delay: 0.28 + orderedThreadGroups.findIndex((item) => item.id === group.id) * 0.035,
-                }}
+                transition={{ layout: { duration: 0 } }}
                 className="rounded-[16px] px-1.5 py-1"
                 onDragStart={() => setDraggedWorkspaceId(group.id)}
                 onDragEnd={() => {
@@ -328,8 +308,7 @@ export function BuilderSidebar({
                   setHoveredWorkspaceThreadsId(null);
                 }}
               >
-                <motion.div
-                  layout
+                <div
                   onMouseEnter={() => setHoveredWorkspaceHeaderId(group.id)}
                   onMouseLeave={() => setHoveredWorkspaceHeaderId((current) => (current === group.id ? null : current))}
                   className={`flex items-center gap-2 rounded-[12px] px-1.5 py-1 transition-colors ${
@@ -382,16 +361,12 @@ export function BuilderSidebar({
                       </Tooltip>
                     </div>
                   </div>
-                </motion.div>
+                </div>
 
                 <AnimatePresence initial={false}>
                   {isExpanded && (
-                    <motion.div
+                    <div
                       key={`${group.id}-threads`}
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className="overflow-hidden"
                     >
                       <div className="pb-1 pl-6 pr-1.5 pt-0.5" onMouseEnter={() => setHoveredWorkspaceThreadsId(group.id)} onMouseLeave={() => setHoveredWorkspaceThreadsId((current) => (current === group.id ? null : current))}>
@@ -449,14 +424,14 @@ export function BuilderSidebar({
                           </ShowMore>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </AnimatePresence>
               </Reorder.Item>
             );
           })}
         </Reorder.Group>
-      </motion.div>
+      </div>
 
       <SidebarFooter onOpenSettings={onOpenSettings} />
       <BuilderCommandMenu
@@ -470,6 +445,6 @@ export function BuilderSidebar({
         onToggleCollapse={onToggleCollapse}
         threadGroups={threadGroups}
       />
-    </motion.aside>
+    </aside>
   );
 }

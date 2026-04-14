@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import type { Session } from "@/entities/session/model/types";
 import type { AppScreen, WorkspaceMode } from "@/shared/types/app";
 import { SidebarActions } from "./SidebarActions";
@@ -40,16 +39,13 @@ export function Sidebar({
   onOpenSettings,
 }: SidebarProps) {
   return (
-    <motion.aside
-      initial={false}
-      animate={{
+    <aside
+      className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar"
+      style={{
+        borderColor: "hsl(var(--border-primary))",
         width: isCollapsed ? 0 : 300,
         opacity: isCollapsed ? 0 : 1,
-        x: isCollapsed ? -20 : 0,
       }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar"
-      style={{ borderColor: "hsl(var(--border-primary))" }}
       aria-hidden={isCollapsed}
     >
       <SidebarHeader mode={mode} onModeChange={onModeChange} onToggleCollapse={onToggleCollapse} />
@@ -64,6 +60,6 @@ export function Sidebar({
         onReorderSessions={onReorderSessions}
       />
       <SidebarFooter onOpenSettings={onOpenSettings} />
-    </motion.aside>
+    </aside>
   );
 }

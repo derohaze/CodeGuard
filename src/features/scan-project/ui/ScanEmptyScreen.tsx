@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { Loader } from "@/shared/ui/Loader";
 
@@ -18,35 +17,24 @@ export function ScanEmptyScreen({ onStartScan }: Props) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.35 }}
-      className="flex flex-1 flex-col items-center justify-center bg-surface px-8"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-        className="mb-5 flex items-center justify-center"
-      >
+    <div className="flex flex-1 flex-col items-center justify-center bg-surface px-8">
+      <div className="mb-5 flex items-center justify-center">
         <Search size={28} className="text-txt-secondary" strokeWidth={1.9} />
-      </motion.div>
+      </div>
 
       <h2 className="mb-2 text-xl font-semibold text-txt-primary">Analyze your code for security issues</h2>
       <p className="mb-8 max-w-md text-center text-sm leading-relaxed text-txt-secondary">
         Choose a real file or folder, then let Khwarizm run the connected backend analyst flow.
       </p>
 
-      <motion.button
+      <button
         onClick={handleClick}
         disabled={loading}
         className="flex items-center gap-2 rounded-md border bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-80"
       >
         {loading && <Loader variant="spin" className="size-4 text-primary-foreground" />}
         {loading ? "Opening..." : "Open analyst setup"}
-      </motion.button>
-    </motion.div>
+      </button>
+    </div>
   );
 }

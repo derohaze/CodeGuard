@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { Clock3, FileCode2, FolderGit2, Play, ScanSearch, ShieldCheck, Trash2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { basename } from "@/features/dashboard/model/home-screen.utils";
@@ -57,12 +56,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: 0.1 }}
-      className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-5 pb-4 pt-8 sm:px-6 lg:px-8"
-    >
+    <div className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-5 pb-4 pt-8 sm:px-6 lg:px-8">
       <div className="flex min-h-full w-full flex-1 flex-col gap-5">
         <div className="max-w-[760px]">
           <div className="flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">
@@ -371,7 +365,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 

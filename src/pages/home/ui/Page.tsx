@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { PanelLeftOpen } from "lucide-react";
 import {
   AlertDialog,
@@ -23,7 +22,7 @@ import { PolicyCenterScreen } from "@/features/policy-center";
 import { FindingDetailPanel } from "@/features/review-finding";
 import { ScanEmptyScreen, ScanProgressScreen, ScanResultsScreen } from "@/features/scan-project";
 import { SettingsScreen } from "@/features/settings";
-import { SIDEBAR_COLLAPSED_STORAGE_KEY, resolveMotionDuration, useRuntimeSettings } from "@/features/settings/model/runtimeSettings";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY, useRuntimeSettings } from "@/features/settings/model/runtimeSettings";
 import { Sidebar } from "@/features/sidebar-navigation";
 import { SuggestFixScreen } from "@/features/suggest-fix";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -135,8 +134,6 @@ export default function Page() {
     isSaving: runtimeSettingsSaving,
     patchSettings: patchRuntimeSettings,
   } = useRuntimeSettings();
-  const shellMotionDuration = resolveMotionDuration(0.18, runtimeSettings.motionProfile);
-  const contentMotionDuration = resolveMotionDuration(0.1, runtimeSettings.motionProfile);
   const {
     activeConversation,
     activeConversationId,
@@ -1220,13 +1217,7 @@ export default function Page() {
   return (
     <AppShell>
       {view === "workspace" ? (
-        <motion.div
-          key="workspace-view"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: shellMotionDuration, ease: [0.22, 1, 0.36, 1] }}
-          className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
-        >
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {workspaceMode === "security" ? (
             <Sidebar
               sessions={sessions}
@@ -1278,56 +1269,34 @@ export default function Page() {
             />
           )}
           <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden pt-8">
-            <AnimatePresence>
-              {isSidebarCollapsed && (
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <motion.button
-                      key="sidebar-reopen"
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: shellMotionDuration, ease: "easeOut" }}
-                      onClick={() => setIsSidebarCollapsed(false)}
-                      className="app-no-drag absolute left-4 top-4 z-40 rounded-xl border bg-card p-2 text-txt-secondary shadow-sm transition-colors hover:bg-secondary hover:text-txt-primary"
-                      style={{ borderColor: "hsl(var(--border-soft))" }}
-                      aria-label="Show sidebar"
-                    >
-                      <PanelLeftOpen size={16} />
-                    </motion.button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={8}
-                    className="rounded-xl border border-border-soft bg-surface px-3 py-1.5 text-xs text-txt-primary shadow-md"
+            {isSidebarCollapsed && (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setIsSidebarCollapsed(false)}
+                    className="app-no-drag absolute left-4 top-4 z-40 rounded-xl border bg-card p-2 text-txt-secondary shadow-sm transition-colors hover:bg-secondary hover:text-txt-primary"
+                    style={{ borderColor: "hsl(var(--border-soft))" }}
+                    aria-label="Show sidebar"
                   >
-                    Show sidebar
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </AnimatePresence>
-            <AnimatePresence initial={false} mode="wait">
-              {workspaceMode === "security" ? (
-                <motion.div
-                  key={`security-content-${screen}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: contentMotionDuration, ease: "linear" }}
-                  className="flex min-h-0 min-w-0 flex-1"
+                    <PanelLeftOpen size={16} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  sideOffset={8}
+                  className="rounded-xl border border-border-soft bg-surface px-3 py-1.5 text-xs text-txt-primary shadow-md"
                 >
+                  Show sidebar
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {workspaceMode === "security" ? (
+              <div className="flex min-h-0 min-w-0 flex-1">
                   {renderContent()}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={`builder-content-${activeConversationId ?? "empty"}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: contentMotionDuration, ease: "linear" }}
-                  className="flex min-h-0 min-w-0 flex-1"
-                >
+              </div>
+            ) : (
+              <div className="flex min-h-0 min-w-0 flex-1">
                   <BuilderChatScreen
                     activeConversationId={activeConversationId}
                     composerSettings={composerSettings}
@@ -1355,11 +1324,10 @@ export default function Page() {
                     onStopStreaming={stopStreaming}
                     onCreatePermanentWorktree={createPermanentWorktree}
                   />
-                </motion.div>
-              )}
-            </AnimatePresence>
+              </div>
+            )}
           </div>
-        </motion.div>
+        </div>
       ) : (
         <SettingsScreen
           onBack={() => setView("workspace")}
