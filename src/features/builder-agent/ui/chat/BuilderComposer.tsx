@@ -227,10 +227,6 @@ export function BuilderComposer({
 
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-2 text-[12px] text-txt-secondary">
-              <button className="inline-flex h-6 items-center gap-1.5 rounded-full px-2 transition-colors hover:bg-muted">
-                <span>Local</span>
-                <ChevronDown size={12} />
-              </button>
               <DropdownMenu>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>

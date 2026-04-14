@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { ShinyText } from "@/components/ui/shiny-text";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BuilderMessage } from "../../model/mockBuilderAgent";
 import { BuilderConversationMenu } from "./BuilderConversationMenu";
@@ -273,13 +274,17 @@ export function BuilderConversationView({
               <div key={message.id} className="max-w-[92%] px-2 py-1 text-[15px] leading-8 text-txt-primary">
                 <div className="space-y-2">
                   {message.isStreaming && !message.text && (
-                    <div className="inline-flex items-center gap-2 rounded-full bg-[#f3ece0] px-3 py-1.5 text-[13px] text-[#6d655c]">
-                      <span className="flex gap-1">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:0ms]" />
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:150ms]" />
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:300ms]" />
-                      </span>
-                      <span>Thinking...</span>
+                    <div className="inline-flex items-center px-1 py-1 text-[13px] text-[#6d655c]">
+                      <ShinyText
+                        text="Thinking"
+                        className="leading-none"
+                        color="#7a6f62"
+                        shineColor="#fff7ed"
+                        speed={2.2}
+                        spread={70}
+                        direction="left"
+                        yoyo={false}
+                      />
                     </div>
                   )}
                   {message.text && (

@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BuilderChatScreen } from "./BuilderChatScreen";
 
+vi.mock("@/components/ui/shiny-text", () => ({
+  ShinyText: ({ text, className }: { text: string; className?: string }) => <span className={className}>{text}</span>,
+}));
+
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, ...props }: { children?: ReactNode } & Record<string, unknown>) => (
@@ -61,7 +65,7 @@ describe("BuilderChatScreen", () => {
 
     expect(screen.queryByText("GPT-5.4")).not.toBeInTheDocument();
     expect(screen.queryByText("Medium")).not.toBeInTheDocument();
-    expect(screen.getByText("Thinking...")).toBeInTheDocument();
+    expect(screen.getByText("Thinking")).toBeInTheDocument();
     expect(screen.queryByLabelText("Jump to latest message")).not.toBeInTheDocument();
   });
 });
