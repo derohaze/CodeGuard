@@ -59,7 +59,7 @@ export function AnalyticsDashboardScreen({ session, onBack, onOpenRepoOverview }
                 This surface summarizes remediation throughput, approval bottlenecks, policy pressure, and current risk distribution for the active security run.
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {session.findings.length} analyzed finding{session.findings.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -271,23 +271,6 @@ export function AnalyticsDashboardScreen({ session, onBack, onOpenRepoOverview }
             )}
           </div>
         </section>
-
-        <div className="flex items-center justify-end gap-3 border-t pt-4" style={{ borderColor: "hsl(var(--border-primary))" }}>
-          <button
-            onClick={onOpenRepoOverview}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Open repo overview
-          </button>
-          <button
-            onClick={onBack}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Back
-          </button>
-        </div>
       </div>
     </motion.div>
   );

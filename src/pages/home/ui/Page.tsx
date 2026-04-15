@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { PanelLeftOpen } from "lucide-react";
 import {
   AlertDialog,
@@ -132,6 +132,7 @@ export default function Page() {
     isSaving: runtimeSettingsSaving,
     patchSettings: patchRuntimeSettings,
   } = useRuntimeSettings();
+  const sessionWorkspaceTabs = buildSessionWorkspaceTabs(activeSession, screen);
 
   const mergeSessionSummary = useCallback((session: Session) => {
     setSessions((current) => {
@@ -982,9 +983,6 @@ export default function Page() {
             key="scan-results"
             session={activeSession}
             onSelectFinding={(finding) => handleSelectFinding(finding, "scan-completed")}
-            onOpenApprovalQueue={() => setScreen("approval-queue")}
-            onOpenOperationsConsole={() => setScreen("operations-console")}
-            onOpenAuditTrail={() => setScreen("audit-trail")}
           />
         );
       case "audit-trail":
@@ -992,9 +990,7 @@ export default function Page() {
           <AuditTrailScreen
             key="audit-trail"
             session={activeSession}
-            onBack={() => setScreen("scan-completed")}
             onSelectFinding={(finding) => handleSelectFinding(finding, "audit-trail")}
-            onOpenGovernanceCenter={() => setScreen("governance-center")}
           />
         );
       case "governance-center":
@@ -1002,8 +998,6 @@ export default function Page() {
           <GovernanceCenterScreen
             key="governance-center"
             session={activeSession}
-            onOpenAnalyticsDashboard={() => setScreen("analytics-dashboard")}
-            onBack={() => setScreen("audit-trail")}
           />
         );
       case "analytics-dashboard":
@@ -1022,9 +1016,6 @@ export default function Page() {
             session={activeSession}
             repoSummary={repoIntelligenceSummary}
             repoHotspotFeed={repoHotspotFeed}
-            onOpenServiceExposure={() => setScreen("service-exposure")}
-            onOpenTeamSecurityPosture={() => setScreen("team-security-posture")}
-            onBack={() => setScreen("analytics-dashboard")}
           />
         );
       case "service-exposure":
@@ -1034,7 +1025,6 @@ export default function Page() {
             session={activeSession}
             serviceSummary={serviceExposureSummary}
             serviceExposureFeed={serviceExposureFeed}
-            onBack={() => setScreen("repo-overview")}
           />
         );
       case "team-security-posture":
@@ -1045,7 +1035,6 @@ export default function Page() {
             activeSessionId={activeSessionId}
             teamSummary={teamPostureSummary}
             teamPostureFeed={teamPostureFeed}
-            onBack={() => setScreen("repo-overview")}
           />
         );
       case "operations-console":
@@ -1053,10 +1042,8 @@ export default function Page() {
           <OperationsConsoleScreen
             key="operations-console"
             session={activeSession}
-            onOpenAuditTrail={() => setScreen("audit-trail")}
             onRunContinuousApply={handleRunContinuousApply}
             isRunningContinuousApply={isRunningContinuousApply}
-            onBack={() => setScreen(activeSession?.session.status === "completed" ? "scan-completed" : "scan-progress")}
           />
         );
       case "approval-queue":
@@ -1211,7 +1198,17 @@ export default function Page() {
                 </TooltipContent>
               </Tooltip>
             )}
-            <div className="flex min-h-0 min-w-0 flex-1">{renderContent()}</div>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {sessionWorkspaceTabs.length > 0 && (
+                <SessionWorkspaceTabs
+                  session={activeSession}
+                  currentScreen={screen}
+                  tabs={sessionWorkspaceTabs}
+                  onNavigate={(nextScreen) => setScreen(nextScreen)}
+                />
+              )}
+              <div className="flex min-h-0 min-w-0 flex-1">{renderContent()}</div>
+            </div>
           </div>
         </div>
       ) : (
@@ -1274,6 +1271,192 @@ export default function Page() {
         </AlertDialogContent>
       </AlertDialog>
     </AppShell>
+  );
+}
+
+function buildSessionWorkspaceTabs(session: ScanSessionDetail | null, currentScreen: AppScreen): Array<{ screen: AppScreen; label: string }> {
+  if (!session || session.session.status !== "completed") {
+    return [];
+  }
+
+  const allowedScreens = new Set<AppScreen>([
+    "scan-completed",
+    "approval-queue",
+    "operations-console",
+    "audit-trail",
+    "governance-center",
+    "analytics-dashboard",
+    "repo-overview",
+    "service-exposure",
+    "team-security-posture",
+  ]);
+
+  if (!allowedScreens.has(currentScreen)) {
+    return [];
+  }
+
+  return [
+    { screen: "scan-completed", label: "Results" },
+    { screen: "approval-queue", label: "Approval" },
+    { screen: "operations-console", label: "Operations" },
+    { screen: "audit-trail", label: "Audit" },
+    { screen: "governance-center", label: "Governance" },
+    { screen: "analytics-dashboard", label: "Analytics" },
+    { screen: "repo-overview", label: "Repo" },
+    { screen: "service-exposure", label: "Exposure" },
+  ];
+}
+
+function SessionWorkspaceTabs({
+  session,
+  currentScreen,
+  tabs,
+  onNavigate,
+}: {
+  session: ScanSessionDetail | null;
+  currentScreen: AppScreen;
+  tabs: Array<{ screen: AppScreen; label: string }>;
+  onNavigate: (screen: AppScreen) => void;
+}) {
+  if (!session) {
+    return null;
+  }
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{ active: boolean; startX: number; startScrollLeft: number; moved: boolean }>({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+  });
+  const suppressNextTabClickRef = useRef(false);
+  const [isDraggingTabs, setIsDraggingTabs] = useState(false);
+
+  const handleMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const container = scrollRef.current;
+    if (!container) {
+      return;
+    }
+    dragStateRef.current = {
+      active: true,
+      startX: event.clientX,
+      startScrollLeft: container.scrollLeft,
+      moved: false,
+    };
+    setIsDraggingTabs(true);
+    event.preventDefault();
+  };
+
+  const handleMouseMove = useCallback((clientX: number) => {
+    const container = scrollRef.current;
+    if (!container || !dragStateRef.current.active) {
+      return;
+    }
+    const deltaX = clientX - dragStateRef.current.startX;
+    if (Math.abs(deltaX) > 3) {
+      dragStateRef.current.moved = true;
+    }
+    container.scrollLeft = dragStateRef.current.startScrollLeft - deltaX;
+  }, []);
+
+  const handleMouseRelease = useCallback(() => {
+    if (dragStateRef.current.active && dragStateRef.current.moved) {
+      suppressNextTabClickRef.current = true;
+    }
+    dragStateRef.current.active = false;
+    dragStateRef.current.moved = false;
+    setIsDraggingTabs(false);
+  }, []);
+
+  const handleTabClick = (event: ReactMouseEvent<HTMLButtonElement>, screen: AppScreen) => {
+    if (suppressNextTabClickRef.current) {
+      suppressNextTabClickRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    onNavigate(screen);
+  };
+
+  useEffect(() => {
+    if (!isDraggingTabs) {
+      return;
+    }
+
+    const handleWindowMouseMove = (event: MouseEvent) => {
+      handleMouseMove(event.clientX);
+    };
+    const handleWindowMouseUp = () => {
+      handleMouseRelease();
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [handleMouseMove, handleMouseRelease, isDraggingTabs]);
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const container = scrollRef.current;
+    if (!container) {
+      return;
+    }
+    const dominantDelta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    if (dominantDelta === 0) {
+      return;
+    }
+    container.scrollLeft += dominantDelta;
+    event.preventDefault();
+  };
+
+  return (
+    <div className="px-6 pb-2">
+      <div
+        className="rounded-[28px] border bg-card px-6 py-5 shadow-[0_12px_30px_rgba(52,42,28,0.05)]"
+        style={{ borderColor: "hsl(var(--border-soft))" }}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[15px] font-semibold text-txt-primary">{session.session.repo}</p>
+            <p className="mt-1.5 text-xs uppercase tracking-[0.18em] text-txt-tertiary">
+              {session.session.scanMode === "deep" ? "Deep analysis" : "Fast analysis"} | {session.session.time}
+            </p>
+          </div>
+          <p className="pt-0.5 text-sm font-semibold text-txt-primary">
+            {session.verdict === "safe" ? "Reviewed" : "Completed"}
+          </p>
+        </div>
+        <div
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onWheel={handleWheel}
+          className="hide-scrollbar mt-5 overflow-x-auto pb-1 select-none"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none", cursor: isDraggingTabs ? "grabbing" : "grab" }}
+        >
+          <div className="flex min-w-max gap-2.5 pl-0.5 pr-2">
+            {tabs.map((tab) => {
+              const active = currentScreen === tab.screen;
+              return (
+                <button
+                  key={tab.screen}
+                  onClick={(event) => handleTabClick(event, tab.screen)}
+                  className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] transition-all ${
+                    active
+                      ? "bg-[#1e1b16] text-white shadow-[0_10px_22px_rgba(30,27,22,0.22)]"
+                      : "bg-[#f8f2e8] text-[#8b7558] hover:bg-[#f1e7d8] hover:text-txt-primary"
+                  }`}
+                  style={{ borderColor: active ? "#1e1b16" : "hsl(var(--border-soft))" }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

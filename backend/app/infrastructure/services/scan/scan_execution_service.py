@@ -755,6 +755,7 @@ class ScanExecutionService:
                     "review_note": "",
                     "repository_summary": build_repository_summary(profile, repository_artifacts, findings),
                     "coverage_summary": "Coverage summary unavailable due to AI service interruption.",
+                    "analysis_brief": None,
                 }
             self._append_runtime_events(logs)
             if verdict_summary.get("review_note"):
@@ -767,6 +768,7 @@ class ScanExecutionService:
                 or build_repository_summary(profile, repository_artifacts, findings)
             )
             coverage_summary = verdict_summary.get("coverage_summary") or coverage_snapshot["coverage_summary"]
+            analysis_brief = verdict_summary.get("analysis_brief")
             if coverage_summary:
                 logs.append(coverage_summary)
 
@@ -806,6 +808,7 @@ class ScanExecutionService:
                     "runtime_metrics": getattr(self.ai_client, "snapshot_runtime_metrics", lambda **_: None)(),
                     "scan_plan": scan_plan,
                     "repository_summary": repository_summary,
+                    "analysis_brief": analysis_brief,
                     "repository_inventory": repository_inventory,
                     "framework_profile": framework_profile,
                     "repository_graph": repository_graph,
@@ -921,6 +924,7 @@ class ScanExecutionService:
                     "error_message": friendly_error,
                     "findings": [],
                     "candidate_findings": [],
+                    "analysis_brief": None,
                     "is_safe": False,
                     "security_score": None,
                     "score_rationale": {

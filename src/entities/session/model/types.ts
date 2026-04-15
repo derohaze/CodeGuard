@@ -104,6 +104,15 @@ export interface SessionWorkflowSummary {
   blockingItems: number;
 }
 
+export interface SessionAnalysisBrief {
+  scoreExplanation: string;
+  potentialRisks: string[];
+  securityObservations: string[];
+  analysisLimitations: string[];
+  attackThinking: string[];
+  nextSteps: string[];
+}
+
 export interface Session {
   id: string;
   title: string;
@@ -127,6 +136,7 @@ export interface Session {
   runtimeMetrics: Record<string, unknown> | null;
   scanPlan: Record<string, unknown> | null;
   repositorySummary: string | null;
+  analysisBrief: SessionAnalysisBrief | null;
   repositoryInventory: Record<string, unknown> | null;
   frameworkProfile: Record<string, unknown> | null;
   repositoryGraph: Record<string, unknown> | null;

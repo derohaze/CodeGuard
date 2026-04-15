@@ -1,5 +1,5 @@
 import type { Finding, FindingDecisionSummary, RemediationActionResult, RemediationExplanation, RemediationPlan } from "@/entities/finding/model/types";
-import type { Session } from "@/entities/session/model/types";
+import type { Session, SessionAnalysisBrief } from "@/entities/session/model/types";
 import { fetchWithStartupRetry } from "@/shared/api/network";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
@@ -469,6 +469,16 @@ function mapSession(data: SessionApiResponse): Session {
     runtimeMetrics: data.runtime_metrics,
     scanPlan: data.scan_plan,
     repositorySummary: data.repository_summary,
+    analysisBrief: data.analysis_brief
+      ? {
+          scoreExplanation: data.analysis_brief.score_explanation,
+          potentialRisks: data.analysis_brief.potential_risks,
+          securityObservations: data.analysis_brief.security_observations,
+          analysisLimitations: data.analysis_brief.analysis_limitations,
+          attackThinking: data.analysis_brief.attack_thinking,
+          nextSteps: data.analysis_brief.next_steps,
+        }
+      : null,
     repositoryInventory: data.repository_inventory,
     frameworkProfile: data.framework_profile,
     repositoryGraph: data.repository_graph,
@@ -892,6 +902,14 @@ interface SessionApiResponse {
   runtime_metrics: Record<string, unknown> | null;
   scan_plan: Record<string, unknown> | null;
   repository_summary: string | null;
+  analysis_brief: {
+    score_explanation: SessionAnalysisBrief["scoreExplanation"];
+    potential_risks: SessionAnalysisBrief["potentialRisks"];
+    security_observations: SessionAnalysisBrief["securityObservations"];
+    analysis_limitations: SessionAnalysisBrief["analysisLimitations"];
+    attack_thinking: SessionAnalysisBrief["attackThinking"];
+    next_steps: SessionAnalysisBrief["nextSteps"];
+  } | null;
   repository_inventory: Record<string, unknown> | null;
   framework_profile: Record<string, unknown> | null;
   repository_graph: Record<string, unknown> | null;

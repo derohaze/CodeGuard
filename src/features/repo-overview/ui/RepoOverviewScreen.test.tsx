@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { RepoOverviewScreen } from "./RepoOverviewScreen";
@@ -77,9 +77,6 @@ describe("RepoOverviewScreen", () => {
             label: "Critical identity zone",
           },
         ]}
-        onBack={vi.fn()}
-        onOpenTeamSecurityPosture={vi.fn()}
-        onOpenServiceExposure={vi.fn()}
       />,
     );
 
@@ -95,18 +92,11 @@ describe("RepoOverviewScreen", () => {
     expect(screen.getByText(/shared-auth-service/i)).toBeInTheDocument();
   });
 
-  it("supports back navigation", () => {
-    const onBack = vi.fn();
-    const onOpenTeamSecurityPosture = vi.fn();
-    const onOpenServiceExposure = vi.fn();
-    render(<RepoOverviewScreen session={session as never} onBack={onBack} onOpenTeamSecurityPosture={onOpenTeamSecurityPosture} onOpenServiceExposure={onOpenServiceExposure} />);
+  it("does not render footer navigation buttons", () => {
+    render(<RepoOverviewScreen session={session as never} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /open service exposure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /open team posture/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-
-    expect(onOpenServiceExposure).toHaveBeenCalledTimes(1);
-    expect(onOpenTeamSecurityPosture).toHaveBeenCalledTimes(1);
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /open service exposure/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open team posture/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
   });
 });

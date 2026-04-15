@@ -220,22 +220,14 @@ describe("Page intelligence flow", () => {
     render(<Page />);
 
     fireEvent.click(await screen.findByRole("button", { name: /April Security Run/i }));
-
-    await screen.findByRole("button", { name: /open audit trail/i });
-    fireEvent.click(screen.getByRole("button", { name: /open audit trail/i }));
-
-    await screen.findByRole("button", { name: /open governance/i });
-    fireEvent.click(screen.getByRole("button", { name: /open governance/i }));
-
-    await screen.findByRole("button", { name: /open analytics/i });
-    fireEvent.click(screen.getByRole("button", { name: /open analytics/i }));
-
-    await screen.findByRole("button", { name: /open repo overview/i });
-    fireEvent.click(screen.getByRole("button", { name: /open repo overview/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^audit$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^governance$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^analytics$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^repo$/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/repo overview/i)).toBeInTheDocument();
-      expect(screen.getByText(/secure-scan-studio-main/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/secure-scan-studio-main/i).length).toBeGreaterThan(0);
     });
     expect(await screen.findByText(/cross-session repo hotspot feed/i)).toBeInTheDocument();
     expect(await screen.findByText(/shared-auth-service/i)).toBeInTheDocument();

@@ -93,6 +93,7 @@ describe("ScanResultsScreen", () => {
         runtimeMetrics: null,
         scanPlan: null,
         repositorySummary: "Repository assessment summary.",
+        analysisBrief: null,
         repositoryInventory: null,
         frameworkProfile: null,
         repositoryGraph: null,
@@ -134,9 +135,6 @@ describe("ScanResultsScreen", () => {
       <ScanResultsScreen
         session={session}
         onSelectFinding={onSelectFinding}
-        onOpenApprovalQueue={vi.fn()}
-        onOpenOperationsConsole={vi.fn()}
-        onOpenAuditTrail={vi.fn()}
       />,
     );
 
@@ -151,5 +149,96 @@ describe("ScanResultsScreen", () => {
 
     fireEvent.click(screen.getByText("Dynamic query construction may allow injection"));
     expect(onSelectFinding).toHaveBeenCalledWith(expect.objectContaining({ id: "finding-sql" }));
+  });
+
+  it("renders AI-generated analyst brief sections when available", () => {
+    const session = {
+      verdict: "safe",
+      findings: [],
+      candidateFindings: [],
+      issues: { critical: 0, high: 0, medium: 0, low: 0 },
+      errorMessage: null,
+      completedAt: null,
+      session: {
+        id: "session-2",
+        title: "Scan optimization",
+        repo: "optimization",
+        time: "2026-04-15 20:44 UTC",
+        unread: false,
+        status: "completed",
+        preview: "preview",
+        scanMode: "deep",
+        criticalCount: 0,
+        warningCount: 0,
+        findingsCount: 0,
+        candidateFindingsCount: 0,
+        progress: 100,
+        phaseProgress: 100,
+        progressMessage: "Completed",
+        currentPhase: "Completed",
+        elapsedSeconds: 311,
+        progressLogs: [],
+        progressCounters: null,
+        runtimeMetrics: null,
+        scanPlan: null,
+        repositorySummary: "No validated security issue was confirmed in the selected scope.",
+        analysisBrief: {
+          scoreExplanation: "The score remained below 100 because cross-file path evidence and runtime integration visibility were limited in this run.",
+          potentialRisks: ["Redis-backed cache boundaries were reviewed, but key construction should still be checked for tenant isolation drift."],
+          securityObservations: ["Protected routes appear to rely on centralized auth middleware rather than scattered inline checks."],
+          analysisLimitations: ["No cross-file source-to-sink path was reconstructed from the reviewed evidence."],
+          attackThinking: ["Probe malformed API input against monitor endpoints to confirm validators reject unexpected payload shapes."],
+          nextSteps: ["Re-scan after auth or cache changes and add a targeted runtime test for cache isolation."],
+        },
+        repositoryInventory: null,
+        frameworkProfile: null,
+        repositoryGraph: null,
+        graphSummary: null,
+        securityRegistry: null,
+        segmentationSummary: null,
+        pathInventory: null,
+        pathSummary: null,
+        reviewQueueSummary: null,
+        annotations: [],
+        annotationSummary: null,
+        coverageSnapshot: null,
+        coverageSummary: "Coverage summary.",
+        coveragePercent: 100,
+        reviewedFilesCount: 29,
+        eligibleFilesCount: 29,
+        reviewedBlocksCount: 64,
+        totalBlocksCount: 64,
+        reviewedLinesCount: 120,
+        totalLinesCount: 120,
+        tracedPathsCount: 0,
+        totalPathsCount: 0,
+        skippedFilesCount: 0,
+        highRiskFilesCount: 2,
+        isSafe: true,
+        securityScore: 90,
+        scoreRationale: null,
+        targetType: "folder",
+        sourcePath: "D:/repo",
+        preset: "balanced",
+        createdAt: "2026-04-15T20:00:00Z",
+        updatedAt: "2026-04-15T20:44:00Z",
+        lastVerification: null,
+        workflowSummary: null,
+      },
+    } as unknown as ScanSessionDetail;
+
+    render(
+      <ScanResultsScreen
+        session={session}
+        onSelectFinding={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Score meaning")).toBeInTheDocument();
+    expect(screen.getByText("Potential risks")).toBeInTheDocument();
+    expect(screen.getByText("What Aegix could not verify")).toBeInTheDocument();
+    expect(screen.getByText(/cross-file path evidence and runtime integration visibility were limited/i)).toBeInTheDocument();
+    expect(screen.getByText(/redis-backed cache boundaries were reviewed/i)).toBeInTheDocument();
+    expect(screen.getByText(/probe malformed api input against monitor endpoints/i)).toBeInTheDocument();
   });
 });

@@ -10,9 +10,8 @@ vi.mock("framer-motion", () => ({
 }));
 
 describe("OperationsConsoleScreen", () => {
-  it("renders autonomy readiness queue and supports audit navigation", () => {
-    const onOpenAuditTrail = vi.fn();
-    render(<OperationsConsoleScreen session={buildBlockedSessionDetail() as never} onBack={vi.fn()} onOpenAuditTrail={onOpenAuditTrail} />);
+  it("renders autonomy readiness queue without footer navigation buttons", () => {
+    render(<OperationsConsoleScreen session={buildBlockedSessionDetail() as never} />);
 
     expect(screen.getByText(/operations console/i)).toBeInTheDocument();
     expect(screen.getByText(/autonomy readiness queue/i)).toBeInTheDocument();
@@ -20,7 +19,7 @@ describe("OperationsConsoleScreen", () => {
     expect(screen.getByText(/memory carry-forward/i)).toBeInTheDocument();
     expect(screen.getAllByText(/recovery playbook/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/session memory ledger/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/learning loop signals/i)).toBeInTheDocument();
+    expect(screen.getByText(/remediation history signals/i)).toBeInTheDocument();
     expect(screen.getByText(/self-healing controller queue/i)).toBeInTheDocument();
     expect(screen.getByText(/autonomous control plan/i)).toBeInTheDocument();
     expect(screen.getByText(/continuous remediation workflow/i)).toBeInTheDocument();
@@ -30,8 +29,8 @@ describe("OperationsConsoleScreen", () => {
     expect(screen.getAllByText(/policy gate blocks continuous remediation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/suppressed strategy memory must carry forward/i).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /open audit trail/i }));
-    expect(onOpenAuditTrail).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /open audit trail/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
   });
 
   it("launches a controlled apply from the continuous execution queue", () => {
@@ -40,8 +39,6 @@ describe("OperationsConsoleScreen", () => {
     render(
       <OperationsConsoleScreen
         session={buildExecutableSessionDetail() as never}
-        onBack={vi.fn()}
-        onOpenAuditTrail={vi.fn()}
         onRunContinuousApply={onRunContinuousApply}
       />,
     );

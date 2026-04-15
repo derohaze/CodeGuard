@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     api_workers: int = Field(default=1, alias="API_WORKERS")
     app_cors_origins: list[str] | str = Field(default="http://localhost:8080", alias="APP_CORS_ORIGINS")
     ai_provider_order: list[str] | str = Field(default="nvidia", alias="AI_PROVIDER_ORDER")
+    ai_small_provider: str | None = Field(default=None, alias="AI_SMALL_PROVIDER")
+    ai_small_model: str | None = Field(default=None, alias="AI_SMALL_MODEL")
+    ai_large_provider: str | None = Field(default=None, alias="AI_LARGE_PROVIDER")
+    ai_large_model: str | None = Field(default=None, alias="AI_LARGE_MODEL")
 
     nvidia_api_key: str | None = Field(default=None, alias="NVIDIA_API_KEY")
     nvidia_base_url: str = Field(default="https://integrate.api.nvidia.com/v1", alias="NVIDIA_BASE_URL")
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
     nvidia_enable_thinking: bool = Field(default=True, alias="NVIDIA_ENABLE_THINKING")
     builder_chat_api_key: str | None = Field(default=None, alias="BUILDER_CHAT_API_KEY")
     builder_chat_base_url: str = Field(default="https://api.routing.run/v1/chat/completions", alias="BUILDER_CHAT_BASE_URL")
-    builder_chat_model: str = Field(default="route/glm-5.1", alias="BUILDER_CHAT_MODEL")
+    builder_chat_model: str = Field(default="route/glm-5.1-precision", alias="BUILDER_CHAT_MODEL")
     builder_chat_timeout_seconds: float = Field(default=90.0, ge=10.0, le=300.0, alias="BUILDER_CHAT_TIMEOUT_SECONDS")
     builder_chat_temperature: float = Field(default=0.2, ge=0.0, le=2.0, alias="BUILDER_CHAT_TEMPERATURE")
     builder_chat_max_tokens: int = Field(default=1200, ge=128, le=8192, alias="BUILDER_CHAT_MAX_TOKENS")
@@ -81,6 +85,14 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("ai_small_provider", "ai_large_provider", mode="before")
+    @classmethod
+    def normalize_ai_provider_name(cls, value: str | None):
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        return normalized or None
 
     @field_validator("queue_backend", mode="before")
     @classmethod

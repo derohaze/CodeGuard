@@ -158,7 +158,7 @@ describe("Page operations console flow", () => {
     render(<Page />);
 
     fireEvent.click(await screen.findByRole("button", { name: /April Security Run/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /open operations/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^operations$/i }));
 
     expect(await screen.findByText(/operations console/i)).toBeInTheDocument();
     expect(await screen.findByText(/autonomy readiness queue/i)).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe("Page operations console flow", () => {
     expect((await screen.findAllByText(/suppressed strategy memory must carry forward/i)).length).toBeGreaterThan(0);
     expect((await screen.findAllByText(/approval hold remains active/i)).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /open audit trail/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^audit$/i }));
     expect(await screen.findByText(/audit trail/i)).toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("Page operations console flow", () => {
     render(<Page />);
 
     fireEvent.click(await screen.findByRole("button", { name: /April Security Run/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /open operations/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^operations$/i }));
     fireEvent.click(await screen.findByRole("button", { name: /run controlled apply/i }));
 
     expect(retryFixStrategyMock).toHaveBeenCalledWith({

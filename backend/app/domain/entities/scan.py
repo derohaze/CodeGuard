@@ -75,6 +75,7 @@ class ScanSessionEntity:
     runtime_metrics: dict | None = None
     scan_plan: dict | None = None
     repository_summary: str | None = None
+    analysis_brief: dict | None = None
     repository_inventory: dict | None = None
     framework_profile: dict | None = None
     repository_graph: dict | None = None

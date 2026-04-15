@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { ServiceExposureScreen } from "./ServiceExposureScreen";
@@ -61,7 +61,6 @@ describe("ServiceExposureScreen", () => {
             label: "High path concentration",
           },
         ]}
-        onBack={vi.fn()}
       />,
     );
 
@@ -74,12 +73,9 @@ describe("ServiceExposureScreen", () => {
     expect(screen.getByText(/shared-api-surface/i)).toBeInTheDocument();
   });
 
-  it("supports back navigation", () => {
-    const onBack = vi.fn();
-    render(<ServiceExposureScreen session={session as never} onBack={onBack} />);
+  it("does not render footer back button", () => {
+    render(<ServiceExposureScreen session={session as never} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
   });
 });

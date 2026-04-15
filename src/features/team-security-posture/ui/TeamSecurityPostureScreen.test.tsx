@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { TeamSecurityPostureScreen } from "./TeamSecurityPostureScreen";
@@ -88,7 +88,6 @@ describe("TeamSecurityPostureScreen", () => {
             coveragePercent: 67,
           },
         ]}
-        onBack={vi.fn()}
       />,
     );
 
@@ -100,12 +99,9 @@ describe("TeamSecurityPostureScreen", () => {
     expect(screen.getAllByText(/shared-auth-service/i).length).toBeGreaterThan(0);
   });
 
-  it("supports back navigation", () => {
-    const onBack = vi.fn();
-    render(<TeamSecurityPostureScreen sessions={sessions as never} activeSessionId="session-1" onBack={onBack} />);
+  it("does not render footer back button", () => {
+    render(<TeamSecurityPostureScreen sessions={sessions as never} activeSessionId="session-1" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
   });
 });

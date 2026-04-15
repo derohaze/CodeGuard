@@ -9,8 +9,16 @@ Strict rules:
 - keep only findings with a believable exploit path and confidence >= 80
 - require both the sensitive sink and attacker influence to be evident in the supplied data
 - reject any claim that does not provide source hint, sink hint, path hint, and evidence lines
+- reject findings that are only denial-of-service, rate limiting, resource exhaustion, documentation, or test-only concerns
+- reject client-side-only authz findings unless the supplied data shows real server-side impact
+- reject framework-default XSS claims in React or Angular unless an unsafe raw HTML escape hatch is visible
+- reject SSRF claims that control only URL path fragments without host or protocol control
 - prefer rejecting a weak finding over keeping an uncertain one
 - preserve accurate line ranges and evidence anchors
+- validate in this order:
+  - verify the trust boundary and attacker influence
+  - verify the sensitive sink and path continuity
+  - verify that sanitizer or framework behavior does not already neutralize the claim
 - JSON only
 
 Return JSON with exactly this shape:

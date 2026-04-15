@@ -9,9 +9,7 @@ import type { ScanSessionDetail } from "@/shared/api/security";
 
 interface Props {
   session: ScanSessionDetail | null;
-  onBack: () => void;
   onSelectFinding: (finding: Finding) => void;
-  onOpenGovernanceCenter: () => void;
 }
 
 type AuditRow = {
@@ -21,7 +19,7 @@ type AuditRow = {
   timelinePreview: ReturnType<typeof buildAuditTimeline>;
 };
 
-export function AuditTrailScreen({ session, onBack, onSelectFinding, onOpenGovernanceCenter }: Props) {
+export function AuditTrailScreen({ session, onSelectFinding }: Props) {
   if (!session) return null;
 
   const auditRows = [...session.findings]
@@ -67,7 +65,7 @@ export function AuditTrailScreen({ session, onBack, onSelectFinding, onOpenGover
                 This surface consolidates workflow closure, approval history, policy outcomes, and remediation status into a single trail for the current security run.
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {auditRows.length} trail item{auditRows.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -176,6 +174,11 @@ export function AuditTrailScreen({ session, onBack, onSelectFinding, onOpenGover
             <p className="text-sm font-semibold text-txt-primary">Finding trail</p>
           </div>
           <div className="space-y-3">
+            {auditRows.length === 0 ? (
+              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+                No findings are available in this session trail yet.
+              </div>
+            ) : null}
             {auditRows.map(({ finding, decision, timelineSummary, timelinePreview }) => (
               <button
                 key={finding.id}
@@ -233,22 +236,6 @@ export function AuditTrailScreen({ session, onBack, onSelectFinding, onOpenGover
           </div>
         </section>
 
-        <div className="flex items-center justify-end gap-3 border-t pt-4" style={{ borderColor: "hsl(var(--border-primary))" }}>
-          <button
-            onClick={onOpenGovernanceCenter}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Open governance
-          </button>
-          <button
-            onClick={onBack}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Back
-          </button>
-        </div>
       </div>
     </motion.div>
   );

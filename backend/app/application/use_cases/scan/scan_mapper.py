@@ -1,6 +1,7 @@
 from datetime import timezone
 
 from app.application.dto.scan_contracts import (
+    AnalysisBriefResponse,
     AttackSimulationResponse,
     FindingResponse,
     FixSuggestionResponse,
@@ -84,6 +85,7 @@ def map_session_summary(entity: ScanSessionEntity) -> SessionSummaryResponse:
         runtime_metrics=entity.runtime_metrics,
         scan_plan=entity.scan_plan,
         repository_summary=entity.repository_summary,
+        analysis_brief=AnalysisBriefResponse(**entity.analysis_brief) if entity.analysis_brief else None,
         repository_inventory=entity.repository_inventory,
         framework_profile=entity.framework_profile,
         repository_graph=entity.repository_graph,

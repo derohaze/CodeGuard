@@ -91,6 +91,15 @@ class ScanJobResponse(BaseModel):
     finished_at: datetime | None = None
 
 
+class AnalysisBriefResponse(BaseModel):
+    score_explanation: str = ""
+    potential_risks: list[str] = Field(default_factory=list)
+    security_observations: list[str] = Field(default_factory=list)
+    analysis_limitations: list[str] = Field(default_factory=list)
+    attack_thinking: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)
+
+
 class SessionSummaryResponse(BaseModel):
     id: str
     title: str
@@ -114,6 +123,7 @@ class SessionSummaryResponse(BaseModel):
     runtime_metrics: dict | None = None
     scan_plan: dict | None = None
     repository_summary: str | None = None
+    analysis_brief: AnalysisBriefResponse | None = None
     repository_inventory: dict | None = None
     framework_profile: dict | None = None
     repository_graph: dict | None = None

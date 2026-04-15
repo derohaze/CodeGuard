@@ -78,7 +78,7 @@ describe("AuditTrailScreen", () => {
   };
 
   it("renders audit trail workflow and a normalized recent timeline", () => {
-    render(<AuditTrailScreen session={session as never} onBack={vi.fn()} onSelectFinding={vi.fn()} onOpenGovernanceCenter={vi.fn()} />);
+    render(<AuditTrailScreen session={session as never} onSelectFinding={vi.fn()} />);
 
     expect(screen.getByText(/audit trail/i)).toBeInTheDocument();
     expect(screen.getAllByText(/workflow closure/i).length).toBeGreaterThan(0);
@@ -90,18 +90,14 @@ describe("AuditTrailScreen", () => {
     expect(screen.getByText(/dynamic query construction may allow injection/i)).toBeInTheDocument();
   });
 
-  it("opens the selected finding and supports back navigation", () => {
-    const onBack = vi.fn();
+  it("opens the selected finding without footer navigation buttons", () => {
     const onSelectFinding = vi.fn();
-    const onOpenGovernanceCenter = vi.fn();
-    render(<AuditTrailScreen session={session as never} onBack={onBack} onSelectFinding={onSelectFinding} onOpenGovernanceCenter={onOpenGovernanceCenter} />);
+    render(<AuditTrailScreen session={session as never} onSelectFinding={onSelectFinding} />);
 
     fireEvent.click(screen.getByRole("button", { name: /dynamic query construction may allow injection/i }));
-    fireEvent.click(screen.getByRole("button", { name: /open governance/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
 
     expect(onSelectFinding).toHaveBeenCalledTimes(1);
-    expect(onOpenGovernanceCenter).toHaveBeenCalledTimes(1);
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /open governance/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
   });
 });

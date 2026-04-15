@@ -234,24 +234,19 @@ describe("Page repo routing", () => {
     });
   });
 
-  it("routes from repo overview to service exposure and team posture inside the real app flow", async () => {
+  it("routes from repo overview to service exposure inside the real app flow", async () => {
     render(<Page />);
 
     fireEvent.click(await screen.findByRole("button", { name: /April Security Run/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /open audit trail/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /open governance/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /open analytics/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /open repo overview/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^audit$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^governance$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^analytics$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^repo$/i }));
 
-    fireEvent.click(await screen.findByRole("button", { name: /open service exposure/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^exposure$/i }));
     expect(await screen.findByText(/service exposure view/i)).toBeInTheDocument();
     expect(await screen.findByText(/shared-api-surface/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-
-    fireEvent.click(await screen.findByRole("button", { name: /open team posture/i }));
-    expect(await screen.findByText(/team security posture/i)).toBeInTheDocument();
-    expect(await screen.findByText(/workspace hotspot queue/i)).toBeInTheDocument();
-    expect((await screen.findAllByText(/shared-auth-service/i)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /^repo$/i }));
   });
 });
 

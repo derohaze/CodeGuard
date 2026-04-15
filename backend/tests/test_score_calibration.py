@@ -55,6 +55,17 @@ class ScoreCalibrationTests(unittest.TestCase):
         self.assertLess(result["score"], 100)
         self.assertEqual(result["rationale"]["path_count"], 0)
 
+    def test_full_coverage_without_paths_on_fastapi_is_cautious_but_not_harsh(self) -> None:
+        result = calibrate_security_score(
+            validated_findings=[],
+            candidate_findings=[],
+            coverage_snapshot={"coverage_percent": 100},
+            framework_profile={"primary_framework": "fastapi", "frameworks": ["fastapi"]},
+            path_summary={"candidate_path_count": 0},
+        )
+        self.assertGreaterEqual(result["score"], 90)
+        self.assertLess(result["score"], 100)
+
     def test_candidate_pressure_lowers_partial_safe_score(self) -> None:
         result = calibrate_security_score(
             validated_findings=[],

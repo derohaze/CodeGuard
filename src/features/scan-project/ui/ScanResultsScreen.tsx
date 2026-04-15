@@ -13,17 +13,15 @@ import { toAnalystCopy } from "@/shared/lib/analyst-copy";
 interface Props {
   session: ScanSessionDetail | null;
   onSelectFinding: (finding: Finding) => void;
-  onOpenApprovalQueue: () => void;
-  onOpenOperationsConsole: () => void;
-  onOpenAuditTrail: () => void;
 }
 
-export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueue, onOpenOperationsConsole, onOpenAuditTrail }: Props) {
+export function ScanResultsScreen({ session, onSelectFinding }: Props) {
   if (!session) return null;
   const safeVerdict = session.verdict === "safe";
   const hasFindings = session.findings.length > 0;
   const hasCoverageGap = session.session.coveragePercent < 100;
   const hasSecurityScore = typeof session.session.securityScore === "number";
+  const analysisBrief = session.session.analysisBrief;
   const excludedFiles = getExcludedFiles(session.session.coverageSnapshot);
   const orderedValidatedFindings = orderFindingsByDecisionPriority(session.findings);
   const filteredCandidateFindings = dedupeCandidateFindings(orderedValidatedFindings, session.candidateFindings);
@@ -33,8 +31,14 @@ export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueu
   const surfacedValidatedFindings = orderedValidatedFindings.filter((finding) => !approvalQueuedFindingIds.has(finding.id));
   const activeFindingCounts = countSeverities(surfacedValidatedFindings);
   const activeValidatedCount = surfacedValidatedFindings.length;
-  void onOpenApprovalQueue;
-
+  const hasAnalysisBrief = Boolean(
+    analysisBrief?.scoreExplanation
+      || analysisBrief?.potentialRisks.length
+      || analysisBrief?.securityObservations.length
+      || analysisBrief?.analysisLimitations.length
+      || analysisBrief?.attackThinking.length
+      || analysisBrief?.nextSteps.length,
+  );
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -157,30 +161,14 @@ export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueu
             className="rounded-lg border bg-card px-5 py-4"
             style={{ borderColor: "hsl(var(--border-soft))" }}
           >
-            <div className="flex items-center justify-between gap-3">
+            <div>
               <div>
                 <p className="text-sm font-semibold text-txt-primary">Workflow orchestration</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.16em] text-txt-tertiary">{session.session.workflowSummary.label}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-txt-tertiary">
-                  {session.session.workflowSummary.activeController}
-                </span>
-                <button
-                  onClick={onOpenAuditTrail}
-                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-txt-primary transition-colors hover:bg-muted/30"
-                  style={{ borderColor: "hsl(var(--border-soft))" }}
-                >
-                  Open audit trail
-                </button>
-                <button
-                  onClick={onOpenOperationsConsole}
-                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-txt-primary transition-colors hover:bg-muted/30"
-                  style={{ borderColor: "hsl(var(--border-soft))" }}
-                >
-                  Open operations
-                </button>
-              </div>
+              <p className="mt-2 text-xs font-medium uppercase tracking-[0.16em] text-txt-tertiary">
+                {session.session.workflowSummary.activeController}
+              </p>
             </div>
             <p className="mt-2 text-sm leading-6 text-txt-secondary">{session.session.workflowSummary.summary}</p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -354,6 +342,51 @@ export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueu
           />
         </motion.div>
 
+        {hasAnalysisBrief && analysisBrief && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.23 }}
+            className="grid gap-3 md:grid-cols-2"
+          >
+            <AnalystListCard
+              label="Score meaning"
+              intro={analysisBrief.scoreExplanation}
+              items={[]}
+            />
+            <AnalystListCard
+              label="Potential risks"
+              intro="Unconfirmed concerns derived from reviewed evidence, missing verification, or suspicious patterns."
+              items={analysisBrief.potentialRisks}
+              emptyMessage="No additional potential risk was surfaced beyond the validated queue."
+            />
+            <AnalystListCard
+              label="Security observations"
+              intro="Defensive patterns that appear to be present in the reviewed scope."
+              items={analysisBrief.securityObservations}
+              emptyMessage="No distinct defensive observation was captured for this run."
+            />
+            <AnalystListCard
+              label="What Aegix could not verify"
+              intro="These are real analysis limits from the reviewed run, not proof that the code is unsafe."
+              items={analysisBrief.analysisLimitations}
+              emptyMessage="No major verification limit was surfaced for this run."
+            />
+            <AnalystListCard
+              label="If I were attacking this"
+              intro="Attack probes Aegix would prioritize next against the reviewed surfaces."
+              items={analysisBrief.attackThinking}
+              emptyMessage="No additional attack probe was highlighted beyond the reviewed surfaces."
+            />
+            <AnalystListCard
+              label="Recommended next steps"
+              intro="Concrete follow-up actions generated from the current run."
+              items={analysisBrief.nextSteps}
+              emptyMessage="No additional follow-up step was suggested for this run."
+            />
+          </motion.div>
+        )}
+
         <FindingsCard
           title="Validated findings"
           subtitle={approvalQueue.length > 0 ? "Open findings only" : undefined}
@@ -362,7 +395,9 @@ export function ScanResultsScreen({ session, onSelectFinding, onOpenApprovalQueu
             safeVerdict
               ? hasCoverageGap
                 ? "No confirmed finding was retained, but the reviewed coverage was partial. The score stays below 100 until the selected scope is fully covered."
-                : "The analysis finished with a score of 100/100. No high-confidence, confirmed security issue was found in the reviewed scope."
+                : hasSecurityScore
+                  ? `The analysis finished with a score of ${session.session.securityScore}/100. No high-confidence, confirmed security issue was found in the reviewed scope.`
+                  : "No high-confidence, confirmed security issue was found in the reviewed scope."
               : approvalQueue.length > 0
                 ? "All validated findings in this session are already tracked in the review queue below."
                 : "No confirmed findings were returned for this analysis."
@@ -608,6 +643,37 @@ function InfoSummaryCard({
       <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className="mt-3 text-sm font-semibold text-txt-primary">{value}</p>
       <p className="mt-2 text-xs leading-5 text-txt-secondary">{note}</p>
+    </div>
+  );
+}
+
+function AnalystListCard({
+  label,
+  intro,
+  items,
+  emptyMessage,
+}: {
+  label: string;
+  intro: string;
+  items: string[];
+  emptyMessage?: string;
+}) {
+  return (
+    <div className="rounded-lg border bg-card px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+      <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
+      <p className="mt-3 text-sm leading-6 text-txt-secondary">{intro}</p>
+      {items.length > 0 ? (
+        <div className="mt-3 space-y-2 text-sm text-txt-primary">
+          {items.map((item, index) => (
+            <p key={`${label}-${index}`} className="leading-6">
+              {index + 1}. {item}
+            </p>
+          ))}
+        </div>
+      ) : emptyMessage !== undefined ? (
+        <p className="mt-3 text-sm leading-6 text-txt-secondary">{emptyMessage ?? "No additional analyst note was captured."}</p>
+      ) : null
+      }
     </div>
   );
 }

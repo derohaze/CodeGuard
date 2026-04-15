@@ -14,8 +14,6 @@ import { buildSelfHealingControllerSignals, summarizeSelfHealingControllerSignal
 
 interface Props {
   session: ScanSessionDetail | null;
-  onBack: () => void;
-  onOpenAuditTrail: () => void;
   onRunContinuousApply?: (input: {
     findingId: string;
     excludedStrategyIds: string[];
@@ -26,8 +24,6 @@ interface Props {
 
 export function OperationsConsoleScreen({
   session,
-  onBack,
-  onOpenAuditTrail,
   onRunContinuousApply,
   isRunningContinuousApply = false,
 }: Props) {
@@ -390,6 +386,7 @@ export function OperationsConsoleScreen({
           </section>
         )}
 
+        {autonomySignals.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -399,12 +396,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Autonomy readiness queue</p>
           </div>
           <div className="space-y-3">
-            {autonomySignals.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No active autonomy signal is currently delaying operational progression.
-              </div>
-            ) : (
-              autonomySignals.map((item) => (
+            {autonomySignals.map((item) => (
                 <div
                   key={`${item.signalClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -423,11 +415,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {selfHealingSignals.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -437,12 +430,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Self-healing controller queue</p>
           </div>
           <div className="space-y-3">
-            {selfHealingSignals.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No self-healing signal is currently active for this run.
-              </div>
-            ) : (
-              selfHealingSignals.map((item) => (
+            {selfHealingSignals.map((item) => (
                 <div
                   key={`${item.signalClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -461,11 +449,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next controller action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {continuousExecutionCandidates.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -475,12 +464,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Continuous execution queue</p>
           </div>
           <div className="space-y-3">
-            {continuousExecutionCandidates.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No guarded retry candidate is currently eligible for continuous execution.
-              </div>
-            ) : (
-              continuousExecutionCandidates.map((item) => (
+            {continuousExecutionCandidates.map((item) => (
                 <div
                   key={item.finding.id}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -515,11 +499,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next execution action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {sessionMemoryLedger.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -529,12 +514,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Session memory ledger</p>
           </div>
           <div className="space-y-3">
-            {sessionMemoryLedger.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No session memory ledger entries are currently active for this run.
-              </div>
-            ) : (
-              sessionMemoryLedger.map((item) => (
+            {sessionMemoryLedger.map((item) => (
                 <div
                   key={`${item.memoryClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -553,11 +533,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next memory action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {recoveryPlaybook.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -567,12 +548,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Recovery playbook</p>
           </div>
           <div className="space-y-3">
-            {recoveryPlaybook.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No recovery playbook item is currently active for this run.
-              </div>
-            ) : (
-              recoveryPlaybook.map((item) => (
+            {recoveryPlaybook.map((item) => (
                 <div
                   key={`${item.recoveryClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -593,11 +569,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Controller status" value={item.controllerStatus} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {recommendationReuse.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -607,12 +584,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Recommendation reuse queue</p>
           </div>
           <div className="space-y-3">
-            {recommendationReuse.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No recommendation reuse signal is currently active for this run.
-              </div>
-            ) : (
-              recommendationReuse.map((item) => (
+            {recommendationReuse.map((item) => (
                 <div
                   key={`${item.reuseClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -631,11 +603,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next reuse action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {memoryCarryForward.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -645,12 +618,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Memory carry-forward</p>
           </div>
           <div className="space-y-3">
-            {memoryCarryForward.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No session memory currently needs to carry forward into the next remediation pass.
-              </div>
-            ) : (
-              memoryCarryForward.map((item) => (
+            {memoryCarryForward.map((item) => (
                 <div
                   key={`${item.memoryClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -669,11 +637,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next memory action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {continuousRemediation.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -683,12 +652,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Continuous remediation workflow</p>
           </div>
           <div className="space-y-3">
-            {continuousRemediation.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No continuous remediation window is currently active for this run.
-              </div>
-            ) : (
-              continuousRemediation.map((item) => (
+            {continuousRemediation.map((item) => (
                 <div
                   key={`${item.workflowClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -707,26 +671,22 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next workflow action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {learningSignals.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
         >
           <div className="mb-3 flex items-center gap-2">
             <Activity size={16} className="text-txt-secondary" />
-            <p className="text-sm font-semibold text-txt-primary">Learning loop signals</p>
+            <p className="text-sm font-semibold text-txt-primary">Remediation history signals</p>
           </div>
           <div className="space-y-3">
-            {learningSignals.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No learning signal is currently available from the active finding set.
-              </div>
-            ) : (
-              learningSignals.map((item) => (
+            {learningSignals.map((item) => (
                 <div
                   key={`${item.finding.id}-${item.signalClass}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -748,11 +708,12 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
+        {controlDecisions.length > 0 && (
         <section
           className="rounded-2xl border bg-card px-5 py-4 shadow-card"
           style={{ borderColor: "hsl(var(--border-soft))" }}
@@ -762,12 +723,7 @@ export function OperationsConsoleScreen({
             <p className="text-sm font-semibold text-txt-primary">Autonomous control plan</p>
           </div>
           <div className="space-y-3">
-            {controlDecisions.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                No control decision is currently active beyond the baseline workflow signals.
-              </div>
-            ) : (
-              controlDecisions.map((item) => (
+            {controlDecisions.map((item) => (
                 <div
                   key={`${item.controlClass}-${item.label}`}
                   className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -786,10 +742,10 @@ export function OperationsConsoleScreen({
                     <OperationsRow label="Next control action" value={item.nextAction} />
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </section>
+        )}
 
         {recovery && (
           <section
@@ -809,22 +765,6 @@ export function OperationsConsoleScreen({
           </section>
         )}
 
-        <div className="flex items-center justify-end gap-3 border-t pt-4" style={{ borderColor: "hsl(var(--border-primary))" }}>
-          <button
-            onClick={onOpenAuditTrail}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Open audit trail
-          </button>
-          <button
-            onClick={onBack}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Back
-          </button>
-        </div>
       </div>
     </motion.div>
   );

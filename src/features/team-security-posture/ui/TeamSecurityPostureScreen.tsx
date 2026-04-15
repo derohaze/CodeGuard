@@ -9,7 +9,6 @@ interface Props {
   activeSessionId: string | null;
   teamSummary?: WorkflowTeamPostureSummary | null;
   teamPostureFeed?: WorkflowTeamPostureItem[] | null;
-  onBack: () => void;
 }
 
 export function TeamSecurityPostureScreen({
@@ -17,7 +16,6 @@ export function TeamSecurityPostureScreen({
   activeSessionId,
   teamSummary = null,
   teamPostureFeed = null,
-  onBack,
 }: Props) {
   const completedSessions = sessions.filter((session) => session.status === "completed");
   const averageSecurityScore = calculateAverageSecurityScore(completedSessions);
@@ -26,6 +24,7 @@ export function TeamSecurityPostureScreen({
   const totalWarnings = sessions.reduce((sum, session) => sum + session.warningCount, 0);
   const safeSessions = sessions.filter((session) => session.isSafe).length;
   const postureHotspots = buildTeamPostureHotspots(sessions);
+  const actionableTeamPostureFeed = buildActionableTeamPostureFeed(teamPostureFeed);
   const localHotspotSummary = summarizeTeamPostureHotspots(postureHotspots);
   const hotspotSummary = teamSummary
     ? {
@@ -44,7 +43,7 @@ export function TeamSecurityPostureScreen({
       if (scoreDelta !== 0) return scoreDelta;
       return right.findingsCount - left.findingsCount;
     })
-    .slice(0, 5);
+    .slice(0, 3);
 
   return (
     <motion.div
@@ -66,7 +65,7 @@ export function TeamSecurityPostureScreen({
                 This surface summarizes security posture across the sessions currently tracked in the workspace, including recent risk load, score trends, and high-pressure repositories.
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {sessions.length} session{sessions.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -178,13 +177,13 @@ export function TeamSecurityPostureScreen({
         >
           <p className="text-sm font-semibold text-txt-primary">Workspace hotspot queue</p>
           <div className="mt-3 space-y-3">
-            {teamPostureFeed !== null ? (
-              teamPostureFeed.length === 0 ? (
+            {actionableTeamPostureFeed !== null ? (
+              actionableTeamPostureFeed.length === 0 ? (
                 <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
-                  No active workspace hotspot is currently blocking posture review.
+                  No actionable workspace hotspot remains (all current items have zero findings).
                 </div>
               ) : (
-                teamPostureFeed.map((item) => (
+                actionableTeamPostureFeed.map((item) => (
                   <div
                     key={`${item.sessionId}-${item.hotspotClass}`}
                     className={`rounded-2xl border px-4 py-4 ${item.sessionId === activeSessionId ? "bg-[#f8f3ea]" : "bg-[#fbf7f1]"}`}
@@ -242,15 +241,6 @@ export function TeamSecurityPostureScreen({
           </div>
         </section>
 
-        <div className="flex items-center justify-end gap-3 border-t pt-4" style={{ borderColor: "hsl(var(--border-primary))" }}>
-          <button
-            onClick={onBack}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Back
-          </button>
-        </div>
       </div>
     </motion.div>
   );
@@ -299,4 +289,26 @@ function calculateAverageSecurityScore(sessions: Session[]) {
   if (scoredSessions.length === 0) return null;
   const total = scoredSessions.reduce((sum, session) => sum + (session.securityScore ?? 0), 0);
   return Math.round(total / scoredSessions.length);
+}
+
+function buildActionableTeamPostureFeed(feed: WorkflowTeamPostureItem[] | null): WorkflowTeamPostureItem[] | null {
+  if (feed === null) {
+    return null;
+  }
+
+  const seen = new Set<string>();
+  const deduped: WorkflowTeamPostureItem[] = [];
+
+  for (const item of feed) {
+    const key = [item.repo.trim().toLowerCase(), item.hotspotClass, item.priority, item.status].join("|");
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  return deduped
+    .filter((item) => item.findingCount > 0)
+    .slice(0, 8);
 }

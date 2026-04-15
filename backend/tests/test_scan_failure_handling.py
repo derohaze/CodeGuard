@@ -100,6 +100,7 @@ class ScanFailureHandlingTests(unittest.TestCase):
             self.assertEqual(repository.session.coverage_percent, 0)
             self.assertEqual(repository.session.findings, [])
             self.assertEqual(repository.session.candidate_findings, [])
+            self.assertIsNone(repository.session.analysis_brief)
             self.assertFalse(repository.session.is_safe)
             self.assertEqual(
                 repository.session.error_message,
@@ -120,6 +121,7 @@ class ScanFailureHandlingTests(unittest.TestCase):
             self.assertEqual(repository.session.status, "completed")
             self.assertIsInstance(repository.session.repository_summary, str)
             self.assertTrue(repository.session.repository_summary)
+            self.assertIsNone(repository.session.analysis_brief)
 
 
 if __name__ == "__main__":

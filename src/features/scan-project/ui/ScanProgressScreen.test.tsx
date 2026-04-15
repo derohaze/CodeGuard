@@ -99,4 +99,79 @@ describe("ScanProgressScreen", () => {
     expect(screen.queryByText(/trust boundaries, framework markers, sinks, and graph summaries/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Coverage starts during review")).not.toBeInTheDocument();
   });
+
+  it("shows a clear empty-path message when scan completed with no path candidates", () => {
+    const session = {
+      verdict: "safe",
+      findings: [],
+      candidateFindings: [],
+      issues: { critical: 0, high: 0, medium: 0, low: 0 },
+      errorMessage: null,
+      completedAt: "2026-04-13T00:05:00Z",
+      session: {
+        id: "session-no-paths",
+        title: "Scan backend",
+        repo: "backend",
+        time: "2026-04-13 01:00 UTC",
+        unread: false,
+        status: "completed",
+        preview: "preview",
+        scanMode: "deep",
+        criticalCount: 0,
+        warningCount: 0,
+        findingsCount: 0,
+        candidateFindingsCount: 0,
+        progress: 100,
+        phaseProgress: 100,
+        progressMessage: "Scan completed",
+        currentPhase: "Completed",
+        elapsedSeconds: 9,
+        progressLogs: [],
+        progressCounters: null,
+        runtimeMetrics: null,
+        scanPlan: null,
+        repositorySummary: null,
+        repositoryInventory: null,
+        frameworkProfile: null,
+        repositoryGraph: null,
+        graphSummary: null,
+        securityRegistry: null,
+        segmentationSummary: null,
+        pathInventory: null,
+        pathSummary: { candidate_path_count: 0 },
+        reviewQueueSummary: null,
+        annotations: [],
+        annotationSummary: null,
+        coverageSnapshot: null,
+        coverageSummary: null,
+        coveragePercent: 0,
+        reviewedFilesCount: 0,
+        eligibleFilesCount: 0,
+        reviewedBlocksCount: 0,
+        totalBlocksCount: 0,
+        reviewedLinesCount: 0,
+        totalLinesCount: 0,
+        tracedPathsCount: 0,
+        totalPathsCount: 0,
+        skippedFilesCount: 0,
+        highRiskFilesCount: 0,
+        isSafe: true,
+        securityScore: null,
+        scoreRationale: null,
+        targetType: "folder",
+        sourcePath: "D:/repo",
+        preset: "balanced",
+        createdAt: "2026-04-13T00:00:00Z",
+        updatedAt: "2026-04-13T00:05:00Z",
+        lastVerification: null,
+        workflowSummary: null,
+      },
+    } as unknown as ScanSessionDetail;
+
+    render(<ScanProgressScreen session={session} />);
+
+    expect(screen.getByText("No path candidates")).toBeInTheDocument();
+    expect(screen.getByText("Path tracing ran but found no source-to-sink candidates in this run.")).toBeInTheDocument();
+    expect(screen.queryByText("0/0 paths")).not.toBeInTheDocument();
+  });
 });

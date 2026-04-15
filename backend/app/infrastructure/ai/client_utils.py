@@ -200,6 +200,37 @@ def compact_findings(findings: list[dict], limit: int) -> list[dict]:
     return compact
 
 
+def normalize_analysis_brief(parsed: dict) -> dict | None:
+    if not isinstance(parsed, dict):
+        return None
+
+    def normalize_items(key: str, *, limit: int, width: int) -> list[str]:
+        items = parsed.get(key, [])
+        if not isinstance(items, list):
+            return []
+        normalized: list[str] = []
+        for item in items:
+            text = shorten(str(item).strip(), width=width, placeholder="...")
+            if text and text not in normalized:
+                normalized.append(text)
+            if len(normalized) >= limit:
+                break
+        return normalized
+
+    score_explanation = shorten(str(parsed.get("score_explanation", "")).strip(), width=280, placeholder="...")
+    brief = {
+        "score_explanation": score_explanation,
+        "potential_risks": normalize_items("potential_risks", limit=4, width=220),
+        "security_observations": normalize_items("security_observations", limit=4, width=220),
+        "analysis_limitations": normalize_items("analysis_limitations", limit=4, width=220),
+        "attack_thinking": normalize_items("attack_thinking", limit=4, width=220),
+        "next_steps": normalize_items("next_steps", limit=5, width=220),
+    }
+    if score_explanation or any(brief[key] for key in brief if key != "score_explanation"):
+        return brief
+    return None
+
+
 def normalize_fix_strategy(item: dict) -> dict:
     if not isinstance(item, dict):
         item = {}

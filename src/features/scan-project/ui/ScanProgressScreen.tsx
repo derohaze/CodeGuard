@@ -206,7 +206,7 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
             <ProgressInfoCard
               label="Path review"
               value={pathDisplay.value}
-              note={[pathDisplay.note, `${animatedMetrics.candidateFindingsCount} candidates, ${animatedMetrics.validatedFindingsCount} validated`].filter(Boolean).join(" ")}
+              note={pathDisplay.note}
             />
             <ProgressInfoCard
               label="Live inventory"
@@ -586,8 +586,31 @@ function buildPathDisplay(session: ScanSessionDetail | null, metrics: AnimatedMe
   }
 
   const pathSummary = (session.session.pathSummary ?? {}) as Record<string, unknown>;
-  const candidatePaths = Number(pathSummary.candidate_path_count ?? metrics.totalPathsCount ?? 0);
+  const candidatePathSummary = Number(pathSummary.candidate_path_count);
+  const candidatePaths = Number.isFinite(candidatePathSummary) ? candidatePathSummary : Number(metrics.totalPathsCount ?? 0);
   const reviewedPaths = Number(metrics.tracedPathsCount ?? 0);
+  const preparedPaths = Number(metrics.paths_prepared ?? 0);
+  const preparedPathsTotal = Number(metrics.paths_total ?? 0);
+  const phase = session.session.currentPhase;
+
+  if (session.session.status === "completed" && reviewedPaths <= 0 && candidatePaths <= 0) {
+    return {
+      value: "No path candidates",
+      note: "Path tracing ran but found no source-to-sink candidates in this run.",
+    };
+  }
+  if ((phase === "Discovery" || phase === "Repository mapping" || phase === "Segmentation") && candidatePaths <= 0 && reviewedPaths <= 0) {
+    return {
+      value: "Path tracing pending",
+      note: "Path inventory appears after segmentation completes.",
+    };
+  }
+  if (preparedPathsTotal > 0 && reviewedPaths <= 0 && candidatePaths <= 0) {
+    return {
+      value: `${preparedPaths}/${preparedPathsTotal} paths prepared`,
+      note: "Tracing is building candidate source-to-sink paths.",
+    };
+  }
   if (reviewedPaths <= 0 && candidatePaths > 0) {
     return {
       value: `${candidatePaths} candidate paths`,

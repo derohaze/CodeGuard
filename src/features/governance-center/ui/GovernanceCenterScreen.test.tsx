@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { GovernanceCenterScreen } from "./GovernanceCenterScreen";
@@ -49,7 +49,7 @@ describe("GovernanceCenterScreen", () => {
   };
 
   it("renders governance summaries and review queue", () => {
-    render(<GovernanceCenterScreen session={session as never} onBack={vi.fn()} onOpenAnalyticsDashboard={vi.fn()} />);
+    render(<GovernanceCenterScreen session={session as never} />);
 
     expect(screen.getByText(/governance center/i)).toBeInTheDocument();
     expect(screen.getByText(/approval posture/i)).toBeInTheDocument();
@@ -63,15 +63,10 @@ describe("GovernanceCenterScreen", () => {
     expect(screen.getAllByText(/dynamic query construction may allow injection/i).length).toBeGreaterThan(0);
   });
 
-  it("supports back navigation", () => {
-    const onBack = vi.fn();
-    const onOpenAnalyticsDashboard = vi.fn();
-    render(<GovernanceCenterScreen session={session as never} onBack={onBack} onOpenAnalyticsDashboard={onOpenAnalyticsDashboard} />);
+  it("does not render footer navigation buttons", () => {
+    render(<GovernanceCenterScreen session={session as never} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /open analytics/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-
-    expect(onOpenAnalyticsDashboard).toHaveBeenCalledTimes(1);
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /open analytics/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
   });
 });

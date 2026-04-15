@@ -8,18 +8,12 @@ interface Props {
   session: ScanSessionDetail | null;
   repoSummary?: WorkflowRepoIntelligenceSummary | null;
   repoHotspotFeed?: WorkflowRepoHotspotItem[] | null;
-  onBack: () => void;
-  onOpenTeamSecurityPosture: () => void;
-  onOpenServiceExposure: () => void;
 }
 
 export function RepoOverviewScreen({
   session,
   repoSummary = null,
   repoHotspotFeed = null,
-  onBack,
-  onOpenTeamSecurityPosture,
-  onOpenServiceExposure,
 }: Props) {
   if (!session) return null;
 
@@ -29,6 +23,7 @@ export function RepoOverviewScreen({
   const segmentation = session.session.segmentationSummary;
   const registry = session.session.securityRegistry;
   const hotspots = buildRepoHotspots(session);
+  const dedupedRepoHotspotFeed = dedupeRepoHotspotFeed(repoHotspotFeed);
   const localHotspotSummary = summarizeRepoHotspots(hotspots);
   const hotspotSummary = repoSummary
     ? {
@@ -64,7 +59,7 @@ export function RepoOverviewScreen({
                 {session.session.repositorySummary || "This surface summarizes repository structure, framework signals, graph hints, and security segmentation for the active security run."}
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {session.session.targetType} target
             </span>
           </div>
@@ -199,7 +194,7 @@ export function RepoOverviewScreen({
         >
           <p className="text-sm font-semibold text-txt-primary">Cross-session repo hotspot feed</p>
           <div className="mt-3 space-y-3">
-            {repoHotspotFeed?.map((item) => (
+            {dedupedRepoHotspotFeed?.map((item) => (
               <div
                 key={`${item.sessionId}-${item.hotspotClass}-${item.label}`}
                 className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
@@ -218,12 +213,12 @@ export function RepoOverviewScreen({
                 </div>
               </div>
             ))}
-            {repoHotspotFeed?.length === 0 && (
+            {dedupedRepoHotspotFeed?.length === 0 && (
               <p className="text-sm leading-6 text-txt-secondary">
                 No cross-session repository hotspot remains active in the current workspace window.
               </p>
             )}
-            {repoHotspotFeed === null && (
+            {dedupedRepoHotspotFeed === null && (
               <p className="text-sm leading-6 text-txt-secondary">
                 Workspace hotspot feed is not available. Current-run repository hotspots remain visible below.
               </p>
@@ -299,29 +294,6 @@ export function RepoOverviewScreen({
           </div>
         </section>
 
-        <div className="flex items-center justify-end gap-3 border-t pt-4" style={{ borderColor: "hsl(var(--border-primary))" }}>
-          <button
-            onClick={onOpenServiceExposure}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Open service exposure
-          </button>
-          <button
-            onClick={onOpenTeamSecurityPosture}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Open team posture
-          </button>
-          <button
-            onClick={onBack}
-            className="rounded-xl border bg-card px-5 py-2 text-sm font-medium text-txt-primary"
-            style={{ borderColor: "hsl(var(--border-primary))" }}
-          >
-            Back
-          </button>
-        </div>
       </div>
     </motion.div>
   );
@@ -360,14 +332,18 @@ function OverviewTable({
   return (
     <section className="rounded-2xl border bg-card px-5 py-4 shadow-card" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-sm font-semibold text-txt-primary">{title}</p>
-      <div className="mt-3 space-y-2">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-3 rounded-xl bg-[#fbf7f1] px-4 py-3">
-            <span className="text-sm text-txt-secondary">{row.label}</span>
-            <span className="text-right text-sm font-medium text-txt-primary">{row.value}</span>
-          </div>
-        ))}
-      </div>
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm leading-6 text-txt-secondary">No captured data for this section in the current run.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {rows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-3 rounded-xl bg-[#fbf7f1] px-4 py-3">
+              <span className="text-sm text-txt-secondary">{row.label}</span>
+              <span className="text-right text-sm font-medium text-txt-primary">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -391,10 +367,12 @@ function buildRows(
   source: Record<string, unknown> | null,
   mappings: Array<[string, string]>,
 ): Array<{ label: string; value: string }> {
-  return mappings.map(([key, label]) => ({
-    label,
-    value: formatUnknown(source?.[key]),
-  }));
+  return mappings
+    .map(([key, label]) => ({
+      label,
+      value: formatUnknown(source?.[key]),
+    }))
+    .filter((row) => row.value !== "Not captured");
 }
 
 function formatUnknown(value: unknown): string {
@@ -427,4 +405,24 @@ function formatElapsedSeconds(value: number) {
   const minutes = Math.floor(value / 60);
   const seconds = value % 60;
   return `${minutes}m ${seconds}s`;
+}
+
+function dedupeRepoHotspotFeed(feed: WorkflowRepoHotspotItem[] | null): WorkflowRepoHotspotItem[] | null {
+  if (feed === null) {
+    return null;
+  }
+
+  const seen = new Set<string>();
+  const deduped: WorkflowRepoHotspotItem[] = [];
+
+  for (const item of feed) {
+    const key = [item.repo.trim().toLowerCase(), item.hotspotClass, item.priority, item.label.trim().toLowerCase()].join("|");
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  return deduped.slice(0, 8);
 }
