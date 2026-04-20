@@ -125,7 +125,7 @@ const features = [
   },
   {
     icon: Bot,
-    label: "Builder Agent",
+    label: "Aegix",
     title: "Your guided remediation assistant",
     description: "Walks you through complex vulnerabilities step by step. Explains the issue, recommends the approach, and helps you implement the fix — a knowledgeable co-pilot for secure code remediation.",
     visual: <AgentMockup />,

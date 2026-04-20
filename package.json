@@ -1,5 +1,5 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "aegix-desktop",
   "private": true,
   "version": "0.0.0",
   "main": "electron/main.js",
@@ -16,8 +16,8 @@
     "electron:build:win": "vite build && electron-builder --win"
   },
   "build": {
-    "appId": "com.securescan.studio",
-    "productName": "SecureScan Studio",
+    "appId": "com.aegix.desktop",
+    "productName": "Aegix",
     "directories": {
       "output": "release"
     },
@@ -28,7 +28,12 @@
     ],
     "win": {
       "target": ["nsis"],
-      "icon": "public/icon.png"
+      "icon": "public/icon.ico",
+      "executableName": "Aegix"
+    },
+    "nsis": {
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico"
     }
   },
   "dependencies": {

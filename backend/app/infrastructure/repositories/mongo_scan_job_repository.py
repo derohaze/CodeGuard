@@ -28,6 +28,10 @@ class MongoScanJobRepository(ScanJobRepository):
         cursor = self.collection.find({"session_id": session_id}).sort("created_at", -1).limit(limit)
         return [_document_to_entity(document) async for document in cursor]
 
+    async def list_active(self, limit: int = 200) -> list[ScanJobEntity]:
+        cursor = self.collection.find({"status": {"$in": ["queued", "running"]}}).sort("created_at", 1).limit(limit)
+        return [_document_to_entity(document) async for document in cursor]
+
     async def count_active(self) -> int:
         return int(await self.collection.count_documents({"status": {"$in": ["queued", "running"]}}))
 

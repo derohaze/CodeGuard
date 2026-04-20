@@ -1,13 +1,21 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, Tray } = require('electron');
 const path = require('path');
 
 let mainWindow;
+let tray = null;
+let isQuitting = false;
 const INITIAL_WINDOW_WIDTH = 1120;
 const INITIAL_WINDOW_HEIGHT = 720;
 const MIN_WINDOW_WIDTH = 980;
 const MIN_WINDOW_HEIGHT = 640;
+const APP_NAME = 'Aegix';
+const APP_ID = 'com.aegix.desktop';
+const APP_ICON_PATH = process.platform === 'win32'
+  ? path.join(__dirname, '../public/icon.ico')
+  : path.join(__dirname, '../public/icon.png');
 
-app.setName('Aegix');
+app.setName(APP_NAME);
+app.setAppUserModelId(APP_ID);
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,13 +33,13 @@ function createWindow() {
       symbolColor: '#2a241e',
       height: 32
     },
-    title: 'Aegix',
+    title: APP_NAME,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, '../public/icon.png')
+    icon: APP_ICON_PATH
   });
 
   mainWindow.removeMenu();
@@ -47,7 +55,7 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  mainWindow.setTitle('Aegix');
+  mainWindow.setTitle(APP_NAME);
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return;
     if (mainWindow.isMaximized()) {
@@ -63,6 +71,57 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow.hide();
+  });
+}
+
+function createTray() {
+  if (tray) return;
+
+  tray = new Tray(APP_ICON_PATH);
+  tray.setToolTip(APP_NAME);
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: `Open ${APP_NAME}`,
+        click: () => {
+          if (!mainWindow) {
+            createWindow();
+            return;
+          }
+          mainWindow.show();
+          if (mainWindow.isMinimized()) {
+            mainWindow.restore();
+          }
+          mainWindow.focus();
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+
+  tray.on('double-click', () => {
+    if (!mainWindow) {
+      createWindow();
+      return;
+    }
+    mainWindow.show();
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
   });
 }
 
@@ -86,11 +145,12 @@ app.whenReady().then(() => {
     return result.filePaths[0];
   });
 
+  createTray();
   createWindow();
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (isQuitting && process.platform !== 'darwin') {
     app.quit();
   }
 });
@@ -99,4 +159,8 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });

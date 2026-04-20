@@ -16,7 +16,7 @@ def build_ai_client() -> SecurityAnalysisAIClient:
         client = _build_provider(provider, settings)
         if client is not None:
             return client
-    raise RuntimeError("No supported AI transport is configured. Set AI_SMALL_PROVIDER/AI_LARGE_PROVIDER and matching provider keys.")
+    raise RuntimeError("No supported AI transport is configured. Set NVIDIA_API_KEY or NVIDIA_API_KEYS.")
 
 
 def _build_provider(provider: str, settings) -> SecurityAnalysisAIClient | None:

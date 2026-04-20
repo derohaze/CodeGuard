@@ -11,6 +11,7 @@ ACTIVE_RUNTIME_PROMPTS = frozenset(
         "explain_prompt.md",
         "fix_prompt.md",
         "fix_validator_prompt.md",
+        "penetration_tester_prompt.md",
     }
 )
 PROMPT_PACKS = {
@@ -50,6 +51,11 @@ PROMPT_PACKS = {
     "explain_prompt.md": ("shared_remediation_rules.md", "explain_prompt.md"),
     "fix_prompt.md": ("shared_remediation_rules.md", "fix_prompt.md"),
     "fix_validator_prompt.md": ("shared_remediation_rules.md", "fix_validator_prompt.md"),
+    "penetration_tester_prompt.md": (
+        "shared_scan_rules.md",
+        "shared_framework_focus.md",
+        "penetration_tester_prompt.md",
+    ),
 }
 
 

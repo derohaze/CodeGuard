@@ -12,6 +12,8 @@ from app.domain.entities.scan import FindingEntity, ScanSessionEntity, utc_now
 from app.domain.repositories.scan_job_repository import ScanJobRepository
 from app.domain.repositories.scan_repository import ScanSessionRepository
 from app.domain.services.ai_client import SecurityAnalysisAIClient
+from app.infrastructure.ai.agents.detection_agent import DetectionAgent
+from app.infrastructure.ai.agents.penetration_tester import PenetrationTestAgent
 from app.infrastructure.services.workflow.workflow_persistence import WorkflowPersistenceService
 from app.infrastructure.services.scan.coverage_calculation import build_progress_state, calculate_progress_metrics
 from app.infrastructure.services.scan.duplicate_clustering import cluster_findings
@@ -47,6 +49,7 @@ from app.infrastructure.services.scan.scan_modes import ScanModeConfig, get_scan
 from app.infrastructure.services.scan.segmentation_planning import build_scan_work_units
 from app.infrastructure.services.scan.risk_prioritization import prioritize_review_queue
 from app.infrastructure.services.repository.source_sink_registry import build_source_sink_registry
+from app.infrastructure.services.scan.penetration_sandbox import prepare_penetration_sandbox
 
 logger = logging.getLogger("aegix.scan")
 
@@ -125,9 +128,11 @@ class ScanExecutionService:
                 await self.scan_lock_manager.refresh_submission_locks(lock_lease)
         try:
             getattr(self.ai_client, "reset_runtime_state", lambda: None)()
+            detection_agent = DetectionAgent(self.ai_client)
             source = Path(session.source_path)
             source_root = source if source.is_dir() else source.parent
             mode_config = get_scan_mode_config(session.scan_mode)
+            logs.append("DetectionAgent activated for repository mapping, path review, and finding validation.")
 
             if job_id and self.job_repository is not None:
                 await self._update_job(
@@ -299,20 +304,33 @@ class ScanExecutionService:
                 ),
             )
 
-            repository_map = await self.ai_client.map_repository(
-                project_name=session.repo,
-                source_path=session.source_path,
-                repository_profile=profile,
-                repository_artifacts={
-                    **repository_artifacts,
-                    "framework_profile": framework_profile,
-                    "repository_graph_summary": repository_graph["summary"],
-                    "security_registry_summary": security_registry["summary"],
-                    "path_summary": traced_paths["summary"],
-                },
-                preset=session.preset,
-            )
-            self._append_runtime_events(logs)
+            try:
+                repository_map = await detection_agent.map_repository(
+                    project_name=session.repo,
+                    source_path=session.source_path,
+                    repository_profile=profile,
+                    repository_artifacts={
+                        **repository_artifacts,
+                        "framework_profile": framework_profile,
+                        "repository_graph_summary": repository_graph["summary"],
+                        "security_registry_summary": security_registry["summary"],
+                        "path_summary": traced_paths["summary"],
+                    },
+                    preset=session.preset,
+                )
+                self._append_runtime_events(logs)
+            except ExternalAIServiceError as exc:
+                if not exc.retryable:
+                    raise
+                logger.warning("Repository mapping AI step failed; using deterministic fallback map", exc_info=exc)
+                repository_map = build_repository_map_fallback(
+                    profile=profile,
+                    repository_artifacts=repository_artifacts,
+                    traced_paths=traced_paths,
+                    framework_profile=framework_profile,
+                )
+                logs.append("Repository mapping AI step was unavailable; using deterministic fallback map.")
+
             if repository_map.get("review_note"):
                 logs.append(repository_map["review_note"])
             if repository_map.get("coverage_note"):
@@ -488,7 +506,7 @@ class ScanExecutionService:
                     ),
                 )
                 try:
-                    review = await self.ai_client.review_paths(
+                    review = await detection_agent.review_paths(
                         project_name=session.repo,
                         source_path=session.source_path,
                         repository_profile=profile,
@@ -603,6 +621,7 @@ class ScanExecutionService:
 
             validated = await self._run_validation_passes(
                 session=session,
+                detection_agent=detection_agent,
                 profile=profile,
                 repository_map=repository_map,
                 framework_profile=framework_profile,
@@ -644,6 +663,119 @@ class ScanExecutionService:
                     logs.append("The validator rejected speculative candidates, but deterministic high-confidence local findings were retained.")
                 else:
                     logs.append(validated["review_note"])
+
+            penetration_report: dict | None = None
+            penetration_sandbox: dict | None = None
+            if merged_validated_findings:
+                try:
+                    penetration_sandbox = prepare_penetration_sandbox(
+                        session_id=session.id,
+                        source_path=source,
+                        source_root=source_root,
+                        target_type=session.target_type,
+                        findings=merged_validated_findings,
+                    )
+                    if penetration_sandbox.get("enabled"):
+                        logs.append(
+                            "Prepared isolated penetration sandbox "
+                            f"({int(penetration_sandbox.get('copied_files', 0))} files)."
+                        )
+                    else:
+                        logs.append("Penetration sandbox is disabled; using metadata-only penetration context.")
+                except Exception as exc:  # pragma: no cover - defensive runtime safety
+                    logger.exception("Failed to prepare penetration sandbox; continuing with metadata-only context", exc_info=exc)
+                    penetration_sandbox = {
+                        "enabled": False,
+                        "mode": "metadata_only",
+                        "workspace_root": "",
+                        "manifest_path": "",
+                        "copied_files": 0,
+                        "skipped_files": 0,
+                        "truncated": False,
+                    }
+                    logs.append("Penetration sandbox preparation failed; using metadata-only penetration context.")
+
+                penetration_context = {
+                    "project_name": session.repo,
+                    "source_path": session.source_path,
+                    "preset": session.preset,
+                    "scan_mode": session.scan_mode,
+                    "repository_profile": profile,
+                    "repository_map": {
+                        **repository_map,
+                        "framework_profile": framework_profile,
+                        "repository_graph_summary": repository_graph["summary"],
+                        "path_summary": traced_paths["summary"],
+                    },
+                    "findings": merged_validated_findings,
+                    "candidate_findings": candidate_findings,
+                    "sandbox": penetration_sandbox,
+                }
+
+                await self._update_with_logs(
+                    session_id,
+                    logs,
+                    "Running controlled penetration simulation",
+                    "Executing deterministic exploit validation steps to strengthen remediation context.",
+                    lock_lease=lock_lease,
+                    job_id=job_id,
+                    job_stage="penetration",
+                    scan_mode=session.scan_mode,
+                    current_phase="Penetration testing",
+                    started_at=started_at,
+                    progress_counters={
+                        "penetration_artifacts_ready": 0,
+                        "penetration_artifacts_total": 1,
+                        "candidates_validated": max(1, len(candidate_findings)),
+                        "candidates_total": max(1, len(candidate_findings)),
+                    },
+                )
+                penetration_agent = PenetrationTestAgent(self.ai_client)
+                try:
+                    penetration_report = await penetration_agent.run(penetration_context)
+                    self._append_runtime_events(logs)
+                    if penetration_report.get("review_note"):
+                        logs.append(str(penetration_report["review_note"]))
+                    logs.extend(build_penetration_log_lines(penetration_report))
+                    merged_validated_findings = enrich_findings_with_penetration_overrides(
+                        merged_validated_findings,
+                        penetration_report,
+                    )
+                except ExternalAIServiceError as exc:
+                    logger.warning("Penetration simulation failed; switching to deterministic penetration benchmark", exc_info=exc)
+                    penetration_report = build_penetration_fallback_report(
+                        merged_validated_findings,
+                        reason=f"AI provider fallback ({exc.provider}/{exc.failure_kind})",
+                    )
+                    logs.append("Penetration simulation degraded to deterministic benchmark due to AI provider instability.")
+                    logs.extend(build_penetration_log_lines(penetration_report))
+                except Exception as exc:  # pragma: no cover - defensive runtime safety
+                    logger.exception("Penetration simulation crashed; switching to deterministic penetration benchmark", exc_info=exc)
+                    penetration_report = build_penetration_fallback_report(
+                        merged_validated_findings,
+                        reason="Runtime fallback (unexpected penetration stage error)",
+                    )
+                    logs.append("Penetration simulation stage failed; generated deterministic benchmark fallback.")
+                    logs.extend(build_penetration_log_lines(penetration_report))
+
+                await self._update_with_logs(
+                    session_id,
+                    logs,
+                    "Running controlled penetration simulation",
+                    "Executing deterministic exploit validation steps to strengthen remediation context.",
+                    lock_lease=lock_lease,
+                    job_id=job_id,
+                    job_stage="penetration",
+                    scan_mode=session.scan_mode,
+                    current_phase="Penetration testing",
+                    started_at=started_at,
+                    progress_counters={
+                        "penetration_artifacts_ready": 1,
+                        "penetration_artifacts_total": 1,
+                        "candidates_validated": max(1, len(candidate_findings)),
+                        "candidates_total": max(1, len(candidate_findings)),
+                    },
+                )
 
             findings = dict_findings_to_entities(merged_validated_findings)
             candidate_entities = dict_findings_to_entities(candidate_review_findings)
@@ -768,7 +900,10 @@ class ScanExecutionService:
                 or build_repository_summary(profile, repository_artifacts, findings)
             )
             coverage_summary = verdict_summary.get("coverage_summary") or coverage_snapshot["coverage_summary"]
-            analysis_brief = verdict_summary.get("analysis_brief")
+            analysis_brief = merge_analysis_brief_with_penetration(
+                verdict_summary.get("analysis_brief"),
+                penetration_report,
+            )
             if coverage_summary:
                 logs.append(coverage_summary)
 
@@ -781,6 +916,10 @@ class ScanExecutionService:
                 logs.append(f"Confirmed {len(findings)} validated findings. Highest severity: {findings[0].severity}.")
 
             finished_at = utc_now()
+            runtime_metrics = getattr(self.ai_client, "snapshot_runtime_metrics", lambda **_: None)()
+            runtime_metrics = merge_runtime_metrics_with_penetration(runtime_metrics, penetration_report)
+            runtime_metrics = merge_runtime_metrics_with_penetration_sandbox(runtime_metrics, penetration_sandbox)
+            runtime_metrics = merge_runtime_metrics_with_agent_pipeline(runtime_metrics)
             latest_scan_job = (
                 await self._update_job(
                     session_id,
@@ -805,7 +944,7 @@ class ScanExecutionService:
                     "elapsed_seconds": int(time.monotonic() - started_at),
                     "preview": build_preview(findings, profile["file_count"], repository_artifacts["coverage"]["reviewed_hotspots"]),
                     "progress_logs": logs[-12:],
-                    "runtime_metrics": getattr(self.ai_client, "snapshot_runtime_metrics", lambda **_: None)(),
+                    "runtime_metrics": runtime_metrics,
                     "scan_plan": scan_plan,
                     "repository_summary": repository_summary,
                     "analysis_brief": analysis_brief,
@@ -1083,6 +1222,7 @@ class ScanExecutionService:
         self,
         *,
         session: ScanSessionEntity,
+        detection_agent: DetectionAgent,
         profile: dict,
         repository_map: dict,
         framework_profile: dict,
@@ -1100,7 +1240,7 @@ class ScanExecutionService:
         }
 
         try:
-            first_pass = await self.ai_client.validate_findings(
+            first_pass = await detection_agent.validate_findings(
                 project_name=session.repo,
                 source_path=session.source_path,
                 repository_profile=profile,
@@ -1130,7 +1270,7 @@ class ScanExecutionService:
                     f"Deep validation pass 2 is rechecking {len(second_pass_candidates)} high-signal candidates."
                 )
                 try:
-                    second_pass = await self.ai_client.validate_findings(
+                    second_pass = await detection_agent.validate_findings(
                         project_name=session.repo,
                         source_path=session.source_path,
                         repository_profile=profile,
@@ -1188,6 +1328,305 @@ def merge_validated_findings(validated_findings: list[dict], heuristic_candidate
         merged.append(item)
 
     return merged
+
+
+def build_repository_map_fallback(
+    *,
+    profile: dict,
+    repository_artifacts: dict,
+    traced_paths: dict,
+    framework_profile: dict,
+) -> dict:
+    coverage = repository_artifacts.get("coverage", {}) if isinstance(repository_artifacts, dict) else {}
+    path_items = traced_paths.get("paths", []) if isinstance(traced_paths, dict) else []
+    priority_paths: list[dict] = []
+    seen_files: set[str] = set()
+
+    for path in path_items:
+        sink = path.get("sink", {}) if isinstance(path, dict) else {}
+        source = path.get("source", {}) if isinstance(path, dict) else {}
+        file_path = str(sink.get("file", "")).strip()
+        if not file_path or file_path in seen_files:
+            continue
+        seen_files.add(file_path)
+        try:
+            sink_line = max(1, int(sink.get("line", 1) or 1))
+        except (TypeError, ValueError):
+            sink_line = 1
+        source_hint = f"{source.get('file', 'unknown')}:{source.get('line', 0)}"
+        sink_hint = f"{sink.get('file', 'unknown')}:{sink_line}"
+        priority_paths.append(
+            {
+                "file": file_path,
+                "line": sink_line,
+                "attack_surface": str(sink.get("kind", "selected scope")).replace("_", " "),
+                "review_focus": f"Validate trust boundary from {source_hint} to {sink_hint}.",
+            }
+        )
+        if len(priority_paths) >= 10:
+            break
+
+    stack = framework_profile.get("primary_framework") if isinstance(framework_profile, dict) else "unknown"
+    if not stack or stack == "unknown":
+        languages = profile.get("languages", []) if isinstance(profile, dict) else []
+        stack = ", ".join(str(item) for item in languages[:3]) or "unknown stack"
+
+    return {
+        "review_note": "Repository map was generated using deterministic fallback artifacts.",
+        "repository_summary": (
+            f"Fallback mapping reviewed {int(profile.get('file_count', 0) or 0)} files and "
+            f"{len(path_items)} traced source-to-sink path candidates."
+        ),
+        "coverage_note": (
+            f"Fallback map identified {int(coverage.get('route_files', 0) or 0)} route files, "
+            f"{int(coverage.get('auth_files', 0) or 0)} auth files, and "
+            f"{int(coverage.get('sink_candidates', 0) or 0)} sink candidates on {stack}."
+        ),
+        "trust_boundaries": [
+            "Fallback trust-boundary analysis was derived from repository graph and source-sink registry.",
+            "Treat fallback map as conservative scope guidance and re-run AI mapping when provider latency stabilizes.",
+        ],
+        "priority_paths": priority_paths,
+    }
+
+
+def build_penetration_fallback_report(findings: list[dict], *, reason: str) -> dict:
+    def _safe_int(value: object, default: int = 0) -> int:
+        try:
+            return int(value or default)
+        except (TypeError, ValueError):
+            return default
+
+    normalized_findings = [item for item in findings if isinstance(item, dict)]
+    findings_covered = len(normalized_findings)
+    unique_paths = {
+        (
+            str(item.get("file", "")).strip(),
+            _safe_int(item.get("line", 0), 0),
+            str(item.get("title", "")).strip().lower(),
+        )
+        for item in normalized_findings
+    }
+    confidences: list[int] = []
+    for item in normalized_findings:
+        try:
+            confidences.append(max(0, min(100, int(item.get("confidence", 0) or 0))))
+        except (TypeError, ValueError):
+            continue
+    confidence_average = int(round(sum(confidences) / len(confidences))) if confidences else 0
+    attack_chains = [
+        f"{str(item.get('title', 'Finding')).strip()} -> {str(item.get('file', '')).strip()}:{_safe_int(item.get('line', 0), 0)}"
+        for item in normalized_findings[:3]
+        if str(item.get("file", "")).strip()
+    ]
+
+    return {
+        "review_note": "Penetration simulation used deterministic fallback because AI provider responses were unstable.",
+        "executive_summary": "Deterministic penetration fallback preserved exploit-trace context for validated findings.",
+        "attack_chains": attack_chains,
+        "reproduction_plan": [
+            "Re-run penetration stage with stable provider connectivity to enrich finding-level attack overrides.",
+            "Keep validated findings as remediation scope because source-to-sink evidence remained intact.",
+        ],
+        "analysis_limitations": [reason],
+        "next_steps": [
+            "Apply fixes for validated findings and re-run scan for verification.",
+            "Re-run penetration stage after provider recovery for richer exploit replay details.",
+        ],
+        "benchmark": {
+            "findings_covered": findings_covered,
+            "paths_exercised": len(unique_paths),
+            "confidence_average": confidence_average,
+            "benchmark_summary": (
+                f"Fallback benchmark retained coverage for {findings_covered} validated finding(s) "
+                f"across {len(unique_paths)} path(s)."
+            ),
+        },
+        "finding_overrides": [],
+    }
+
+
+def build_penetration_log_lines(report: dict | None) -> list[str]:
+    if not isinstance(report, dict):
+        return []
+
+    lines: list[str] = []
+    executive_summary = str(report.get("executive_summary", "")).strip()
+    if executive_summary:
+        lines.append(executive_summary)
+
+    benchmark = report.get("benchmark", {})
+    if isinstance(benchmark, dict):
+        benchmark_summary = str(benchmark.get("benchmark_summary", "")).strip()
+        if benchmark_summary:
+            lines.append(benchmark_summary)
+
+    attack_chains = report.get("attack_chains", [])
+    if isinstance(attack_chains, list):
+        lines.extend(str(item).strip() for item in attack_chains[:2] if str(item).strip())
+    return lines[:4]
+
+
+def enrich_findings_with_penetration_overrides(findings: list[dict], report: dict | None) -> list[dict]:
+    if not findings or not isinstance(report, dict):
+        return findings
+    overrides = report.get("finding_overrides", [])
+    if not isinstance(overrides, list) or not overrides:
+        return findings
+
+    lookup: dict[tuple[str, int, str], dict] = {}
+    for item in overrides:
+        if not isinstance(item, dict):
+            continue
+        file_path = str(item.get("file", "")).strip()
+        line = int(item.get("line", 0) or 0)
+        title = str(item.get("title", "")).strip().lower()
+        if not file_path or line <= 0:
+            continue
+        lookup[(file_path, line, title)] = item
+
+    enriched: list[dict] = []
+    for item in findings:
+        next_item = dict(item)
+        key = _build_penetration_finding_key(next_item)
+        override = lookup.get(key)
+        if override is None:
+            fallback_key = (key[0], key[1], "")
+            override = lookup.get(fallback_key)
+        if override is None:
+            enriched.append(next_item)
+            continue
+
+        for field_name in ("attack_input", "attack_execution", "attack_result", "explanation"):
+            value = str(override.get(field_name, "")).strip()
+            if value:
+                next_item[field_name] = value
+
+        override_audit = [str(entry).strip() for entry in override.get("audit_log", []) if str(entry).strip()]
+        if override_audit:
+            existing_audit = [str(entry).strip() for entry in next_item.get("audit_log", []) if str(entry).strip()]
+            next_item["audit_log"] = [*existing_audit, *override_audit][:6]
+
+        enriched.append(next_item)
+    return enriched
+
+
+def merge_analysis_brief_with_penetration(analysis_brief: dict | None, report: dict | None) -> dict | None:
+    if analysis_brief is None and not report:
+        return None
+
+    base = {
+        "score_explanation": "",
+        "potential_risks": [],
+        "security_observations": [],
+        "analysis_limitations": [],
+        "attack_thinking": [],
+        "next_steps": [],
+    }
+    if isinstance(analysis_brief, dict):
+        base.update(
+            {
+                "score_explanation": str(analysis_brief.get("score_explanation", "")).strip(),
+                "potential_risks": [str(item).strip() for item in analysis_brief.get("potential_risks", []) if str(item).strip()],
+                "security_observations": [str(item).strip() for item in analysis_brief.get("security_observations", []) if str(item).strip()],
+                "analysis_limitations": [str(item).strip() for item in analysis_brief.get("analysis_limitations", []) if str(item).strip()],
+                "attack_thinking": [str(item).strip() for item in analysis_brief.get("attack_thinking", []) if str(item).strip()],
+                "next_steps": [str(item).strip() for item in analysis_brief.get("next_steps", []) if str(item).strip()],
+            }
+        )
+
+    if not isinstance(report, dict):
+        return base
+
+    benchmark = report.get("benchmark", {})
+    benchmark_summary = str(benchmark.get("benchmark_summary", "")).strip() if isinstance(benchmark, dict) else ""
+    if benchmark_summary and benchmark_summary not in base["security_observations"]:
+        base["security_observations"].insert(0, benchmark_summary)
+
+    executive_summary = str(report.get("executive_summary", "")).strip()
+    if executive_summary and not base["score_explanation"]:
+        base["score_explanation"] = executive_summary
+    elif executive_summary and executive_summary not in base["security_observations"]:
+        base["security_observations"].append(executive_summary)
+
+    base["attack_thinking"] = _merge_unique_lists(base["attack_thinking"], report.get("attack_chains", []), limit=8)
+    base["next_steps"] = _merge_unique_lists(base["next_steps"], report.get("next_steps", []), limit=8)
+    base["next_steps"] = _merge_unique_lists(base["next_steps"], report.get("reproduction_plan", []), limit=8)
+    base["analysis_limitations"] = _merge_unique_lists(base["analysis_limitations"], report.get("analysis_limitations", []), limit=8)
+    return base
+
+
+def merge_runtime_metrics_with_penetration(runtime_metrics: dict | None, report: dict | None) -> dict | None:
+    if report is None:
+        return runtime_metrics
+
+    metrics = dict(runtime_metrics) if isinstance(runtime_metrics, dict) else {}
+    benchmark = report.get("benchmark", {})
+    if isinstance(benchmark, dict):
+        metrics["penetration_benchmark"] = {
+            "findings_covered": max(0, int(benchmark.get("findings_covered", 0) or 0)),
+            "paths_exercised": max(0, int(benchmark.get("paths_exercised", 0) or 0)),
+            "confidence_average": max(0, min(100, int(benchmark.get("confidence_average", 0) or 0))),
+            "benchmark_summary": str(benchmark.get("benchmark_summary", "")).strip(),
+        }
+    return metrics or None
+
+
+def merge_runtime_metrics_with_penetration_sandbox(runtime_metrics: dict | None, sandbox: dict | None) -> dict | None:
+    if not isinstance(sandbox, dict):
+        return runtime_metrics
+
+    metrics = dict(runtime_metrics) if isinstance(runtime_metrics, dict) else {}
+    metrics["penetration_sandbox"] = {
+        "enabled": bool(sandbox.get("enabled")),
+        "mode": str(sandbox.get("mode", "")).strip(),
+        "workspace_root": str(sandbox.get("workspace_root", "")).strip(),
+        "manifest_path": str(sandbox.get("manifest_path", "")).strip(),
+        "copied_files": max(0, int(sandbox.get("copied_files", 0) or 0)),
+        "skipped_files": max(0, int(sandbox.get("skipped_files", 0) or 0)),
+        "truncated": bool(sandbox.get("truncated", False)),
+    }
+    return metrics or None
+
+
+def merge_runtime_metrics_with_agent_pipeline(runtime_metrics: dict | None) -> dict | None:
+    metrics = dict(runtime_metrics) if isinstance(runtime_metrics, dict) else {}
+    metrics["agent_pipeline"] = {
+        "scan_agents": ["DetectionAgent", "PenetrationTestAgent"],
+        "remediation_agents": ["ExplainAgent", "FixAgent", "ValidationAgent"],
+    }
+    return metrics or None
+
+
+def _build_penetration_finding_key(item: dict) -> tuple[str, int, str]:
+    return (
+        str(item.get("file", "")).strip(),
+        int(item.get("line", 0) or 0),
+        str(item.get("title", "")).strip().lower(),
+    )
+
+
+def _merge_unique_lists(current: list[str], additions: object, *, limit: int) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+
+    for value in current:
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        merged.append(text)
+
+    if isinstance(additions, list):
+        for value in additions:
+            text = str(value).strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            merged.append(text)
+            if len(merged) >= limit:
+                break
+    return merged[:limit]
 
 
 def build_candidate_key(item: dict) -> tuple[str, int, str]:

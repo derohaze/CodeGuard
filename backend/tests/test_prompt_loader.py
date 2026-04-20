@@ -64,6 +64,13 @@ class PromptLoaderTests(unittest.TestCase):
         self.assertIn("denial-of-service", prompt)
         self.assertIn("client-side-only permission checks", prompt)
 
+    def test_penetration_tester_prompt_pack_includes_defensive_scope_constraints(self) -> None:
+        prompt = load_prompt_pack("penetration_tester_prompt.md")
+
+        self.assertIn("authorized defensive review", prompt)
+        self.assertIn("non-destructive penetration assessment", prompt)
+        self.assertIn("finding_overrides", prompt)
+
     def test_all_prompt_markdown_files_are_accounted_for_by_runtime_packs(self) -> None:
         prompt_files = {path.name for path in PROMPTS_DIR.glob("*.md")}
         referenced = set(ACTIVE_RUNTIME_PROMPTS)

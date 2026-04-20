@@ -63,6 +63,15 @@ class ScanLockManager:
         await self._release_key(lease.source_key, lease.owner)
         await self._release_key(lease.session_key, lease.owner)
 
+    async def has_submission_locks(self, lease: ScanLockLease | None) -> bool:
+        if lease is None:
+            return False
+        source_locked = await self._key_owned_by(lease.source_key, lease.owner)
+        if not source_locked:
+            return False
+        session_locked = await self._key_owned_by(lease.session_key, lease.owner)
+        return session_locked
+
     async def build_lease_from_job(self, *, session_id: str, source_fingerprint: str | None, owner: str | None) -> ScanLockLease | None:
         if not source_fingerprint or not owner:
             return None
@@ -131,6 +140,24 @@ class ScanLockManager:
             if current is None or current[0] != owner:
                 return
             _IN_MEMORY_LOCKS.pop(key, None)
+
+    async def _key_owned_by(self, key: str, owner: str) -> bool:
+        client = await self._get_redis_client()
+        if client is not None:
+            current_owner = await client.get(key)
+            if current_owner is None:
+                return False
+            if isinstance(current_owner, bytes):
+                current_owner = current_owner.decode("utf-8", errors="ignore")
+            return str(current_owner) == owner
+        async with _IN_MEMORY_GUARD:
+            current = _IN_MEMORY_LOCKS.get(key)
+            if current is None:
+                return False
+            if current[1] <= time.monotonic():
+                _IN_MEMORY_LOCKS.pop(key, None)
+                return False
+            return current[0] == owner
 
     async def _get_redis_client(self) -> Any | None:
         backend = self.backend

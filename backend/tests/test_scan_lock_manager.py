@@ -39,3 +39,24 @@ class ScanLockManagerTests(unittest.TestCase):
             )
             self.assertIsNotNone(third)
             asyncio.run(manager.release_submission_locks(third))
+
+    def test_has_submission_locks_reflects_current_lease_state(self):
+        settings = type(
+            "S",
+            (),
+            {
+                "scan_lock_backend": "in_memory",
+                "redis_url": None,
+                "session_scan_lock_ttl_seconds": 60,
+                "source_scan_lock_ttl_seconds": 60,
+            },
+        )()
+        with patch("app.infrastructure.services.scan.scan_lock_manager.get_settings", return_value=settings):
+            manager = ScanLockManager()
+            lease = asyncio.run(
+                manager.acquire_submission_locks(session_id="session-check", source_fingerprint="source-check")
+            )
+            self.assertIsNotNone(lease)
+            self.assertTrue(asyncio.run(manager.has_submission_locks(lease)))
+            asyncio.run(manager.release_submission_locks(lease))
+            self.assertFalse(asyncio.run(manager.has_submission_locks(lease)))

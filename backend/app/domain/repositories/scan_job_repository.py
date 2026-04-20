@@ -21,6 +21,10 @@ class ScanJobRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def list_active(self, limit: int = 200) -> list[ScanJobEntity]:
+        raise NotImplementedError
+
+    @abstractmethod
     async def count_active(self) -> int:
         raise NotImplementedError
 

@@ -212,11 +212,21 @@ def get_session_use_case() -> GetSessionUseCase:
 
 
 def get_delete_session_use_case() -> DeleteSessionUseCase:
-    return DeleteSessionUseCase(get_repository(), get_workflow_persistence_service())
+    return DeleteSessionUseCase(
+        get_repository(),
+        get_workflow_persistence_service(),
+        get_scan_job_repository(),
+        get_scan_lock_manager(),
+    )
 
 
 def get_delete_all_sessions_use_case() -> DeleteAllSessionsUseCase:
-    return DeleteAllSessionsUseCase(get_repository(), get_workflow_persistence_service())
+    return DeleteAllSessionsUseCase(
+        get_repository(),
+        get_workflow_persistence_service(),
+        get_scan_job_repository(),
+        get_scan_lock_manager(),
+    )
 
 
 def get_explain_finding_use_case() -> ExplainFindingUseCase:

@@ -4,7 +4,7 @@ from app.application.dto.scan_contracts import StartScanRequest
 from app.core.config import get_settings
 from app.core.exceptions import WorkflowConflictError
 from app.domain.entities.scan_job import ScanJobEntity, build_scan_job_snapshot
-from app.domain.entities.scan import ScanSessionEntity
+from app.domain.entities.scan import ScanSessionEntity, utc_now
 from app.domain.repositories.scan_job_repository import ScanJobRepository
 from app.domain.repositories.scan_repository import ScanSessionRepository
 from app.infrastructure.services.scan.scan_execution_service import create_initial_session
@@ -33,10 +33,15 @@ class StartScanUseCase:
             preset=request.preset,
             scan_mode=request.scan_mode,
         )
+        await self._reconcile_stale_active_jobs(limit=max(settings.global_concurrent_scans_limit * 4, 200))
         active_jobs = await self.job_repository.count_active()
         if active_jobs >= settings.global_concurrent_scans_limit:
             raise WorkflowConflictError("The scan queue is at capacity. Retry after current scans complete.")
         existing_job = await self.job_repository.find_active_by_source(session.source_fingerprint)
+        if existing_job is not None:
+            stale_cleared = await self._cancel_stale_job_if_recoverable(existing_job)
+            if stale_cleared:
+                existing_job = await self.job_repository.find_active_by_source(session.source_fingerprint)
         if existing_job is not None:
             raise WorkflowConflictError("A scan is already running for this source.")
 
@@ -83,6 +88,60 @@ class StartScanUseCase:
             if self.scan_lock_manager is not None:
                 await self.scan_lock_manager.release_submission_locks(lock_lease)
             raise
+
+    async def _reconcile_stale_active_jobs(self, *, limit: int) -> None:
+        for active_job in await self.job_repository.list_active(limit=limit):
+            await self._cancel_stale_job_if_recoverable(active_job)
+
+    async def _cancel_stale_job_if_recoverable(self, job: ScanJobEntity) -> bool:
+        stale_reason = await self._resolve_stale_reason(job)
+        if stale_reason is None:
+            return False
+        await self._cancel_active_job(
+            job,
+            f"Recovered stale active scan job: {stale_reason}.",
+        )
+        return True
+
+    async def _resolve_stale_reason(self, job: ScanJobEntity) -> str | None:
+        session = await self.repository.get_by_id(job.session_id)
+        if session is None:
+            return "session record is missing"
+        if session.status in {"completed", "failed"}:
+            return f"session is already {session.status}"
+        if self.scan_lock_manager is None:
+            return None
+
+        lease = await self.scan_lock_manager.build_lease_from_job(
+            session_id=job.session_id,
+            source_fingerprint=job.source_fingerprint,
+            owner=job.lock_owner,
+        )
+        if lease is None:
+            return "lock metadata is missing"
+        if not await self.scan_lock_manager.has_submission_locks(lease):
+            return "submission locks are missing or expired"
+        return None
+
+    async def _cancel_active_job(self, job: ScanJobEntity, reason: str) -> None:
+        if self.scan_lock_manager is not None:
+            lease = await self.scan_lock_manager.build_lease_from_job(
+                session_id=job.session_id,
+                source_fingerprint=job.source_fingerprint,
+                owner=job.lock_owner,
+            )
+            await self.scan_lock_manager.release_submission_locks(lease)
+
+        await self.job_repository.update(
+            job.id,
+            {
+                "status": "cancelled",
+                "stage": "cancelled",
+                "progress": 100,
+                "error_message": reason,
+                "finished_at": utc_now(),
+            },
+        )
 
     async def mark_dispatch_failed(self, session: ScanSessionEntity, job: ScanJobEntity, error_message: str) -> None:
         if self.scan_lock_manager is not None:

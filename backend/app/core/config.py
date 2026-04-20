@@ -24,12 +24,21 @@ class Settings(BaseSettings):
     ai_large_model: str | None = Field(default=None, alias="AI_LARGE_MODEL")
 
     nvidia_api_key: str | None = Field(default=None, alias="NVIDIA_API_KEY")
+    nvidia_api_keys: list[str] | str | None = Field(default=None, alias="NVIDIA_API_KEYS")
     nvidia_base_url: str = Field(default="https://integrate.api.nvidia.com/v1", alias="NVIDIA_BASE_URL")
     nvidia_model: str = Field(default="openai/gpt-oss-120b", alias="NVIDIA_MODEL")
     nvidia_small_model: str | None = Field(default=None, alias="NVIDIA_SMALL_MODEL")
     nvidia_large_model: str | None = Field(default=None, alias="NVIDIA_LARGE_MODEL")
     nvidia_overflow_model: str | None = Field(default=None, alias="NVIDIA_OVERFLOW_MODEL")
+    nvidia_timeout_seconds: float = Field(default=120.0, ge=30.0, le=600.0, alias="NVIDIA_TIMEOUT_SECONDS")
+    nvidia_retry_attempts: int = Field(default=2, ge=1, le=6, alias="NVIDIA_RETRY_ATTEMPTS")
+    nvidia_retry_backoff_seconds: float = Field(default=1.0, ge=0.0, le=30.0, alias="NVIDIA_RETRY_BACKOFF_SECONDS")
     nvidia_enable_thinking: bool = Field(default=True, alias="NVIDIA_ENABLE_THINKING")
+    nvidia_detection_model: str | None = Field(default=None, alias="NVIDIA_DETECTION_MODEL")
+    nvidia_explain_model: str | None = Field(default=None, alias="NVIDIA_EXPLAIN_MODEL")
+    nvidia_fix_model: str | None = Field(default=None, alias="NVIDIA_FIX_MODEL")
+    nvidia_validation_model: str | None = Field(default=None, alias="NVIDIA_VALIDATION_MODEL")
+    nvidia_penetration_model: str | None = Field(default=None, alias="NVIDIA_PENETRATION_MODEL")
     builder_chat_api_key: str | None = Field(default=None, alias="BUILDER_CHAT_API_KEY")
     builder_chat_base_url: str = Field(default="https://api.routing.run/v1/chat/completions", alias="BUILDER_CHAT_BASE_URL")
     builder_chat_model: str = Field(default="route/glm-5.1-precision", alias="BUILDER_CHAT_MODEL")
@@ -67,6 +76,9 @@ class Settings(BaseSettings):
     external_ingestion_retry_attempts: int = Field(default=3, alias="EXTERNAL_INGESTION_RETRY_ATTEMPTS")
     external_ingestion_backoff_seconds: float = Field(default=0.5, alias="EXTERNAL_INGESTION_BACKOFF_SECONDS")
     external_ingestion_timeout_seconds: float = Field(default=30.0, alias="EXTERNAL_INGESTION_TIMEOUT_SECONDS")
+    penetration_sandbox_enabled: bool = Field(default=True, alias="PENETRATION_SANDBOX_ENABLED")
+    penetration_sandbox_max_files: int = Field(default=120, ge=10, le=2000, alias="PENETRATION_SANDBOX_MAX_FILES")
+    penetration_sandbox_max_total_mb: int = Field(default=50, ge=5, le=4096, alias="PENETRATION_SANDBOX_MAX_TOTAL_MB")
     artifacts_dir: str = Field(
         default=str(Path(__file__).resolve().parents[2] / "artifacts"),
         alias="ARTIFACTS_DIR",
@@ -85,6 +97,20 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("nvidia_api_keys", mode="before")
+    @classmethod
+    def parse_nvidia_api_keys(cls, value: list[str] | str | None):
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+
+        parts: list[str] = []
+        for line in str(value).replace("\r", "\n").split("\n"):
+            parts.extend(item.strip() for item in line.split(","))
+        parsed = [item for item in parts if item]
+        return parsed or None
 
     @field_validator("ai_small_provider", "ai_large_provider", mode="before")
     @classmethod

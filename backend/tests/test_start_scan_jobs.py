@@ -25,6 +25,11 @@ class FakeSessionRepository:
         self.updated.append((session_id, updates))
         return self.created
 
+    async def get_by_id(self, session_id: str):
+        if self.created is not None and self.created.id == session_id:
+            return self.created
+        return None
+
 
 class FakeJobRepository:
     def __init__(self) -> None:
@@ -38,6 +43,14 @@ class FakeJobRepository:
     async def update(self, job_id, updates):
         self.updated.append((job_id, updates))
         return self.created
+
+    async def get_by_id(self, job_id: str):
+        if self.created is not None and self.created.id == job_id:
+            return self.created
+        return None
+
+    async def list_active(self, limit: int = 200):
+        return []
 
     async def count_active(self):
         return 0

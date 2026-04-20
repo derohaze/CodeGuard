@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass
 import logging
@@ -29,40 +30,35 @@ logger = logging.getLogger("aegix.ai")
 class _ProviderTarget:
     provider_name: str
     base_url: str
-    api_key: str | None
+    api_keys: tuple[str, ...]
     timeout_seconds: float
     model: str
     enable_thinking: bool = False
-
-
-_SUPPORTED_TARGET_PROVIDERS = frozenset({"nvidia", "routing_run"})
-_DEPTH_TASKS = frozenset({"explain", "fix_validate", "patch_validate", "final_patch", "verdict", "finding_validate"})
 
 
 class NvidiaSecurityClient(SecurityAnalysisAIClient):
     def __init__(self) -> None:
         settings = get_settings()
         self.provider_name = "nvidia"
-        self.api_key = settings.nvidia_api_key
+        self.api_keys = _resolve_nvidia_api_keys(settings)
         self.base_url = settings.nvidia_base_url.rstrip("/")
-        self._small_target = _resolve_provider_target(settings, tier="small")
-        self._large_target = _resolve_provider_target(settings, tier="large", fallback=self._small_target)
-        self.small_model = self._small_target.model
-        self.large_model = self._large_target.model
+        self.small_model = _resolve_nvidia_model(settings, tier="small")
+        self.large_model = _resolve_nvidia_model(settings, tier="large")
         self.model_router = ModelRouter(
             small_model=self.small_model,
             large_model=self.large_model,
             overflow_model=settings.nvidia_overflow_model,
+            task_overrides=_build_task_model_overrides(settings),
         )
         self.enable_thinking = settings.nvidia_enable_thinking
+        self.request_timeout_seconds = settings.nvidia_timeout_seconds
+        self.retry_attempts = settings.nvidia_retry_attempts
+        self.retry_backoff_seconds = settings.nvidia_retry_backoff_seconds
+        self._api_key_cursor = 0
 
     @staticmethod
     def is_configured(settings) -> bool:
-        try:
-            _resolve_provider_target(settings, tier="small")
-        except RuntimeError:
-            return False
-        return True
+        return bool(_resolve_nvidia_api_keys(settings))
 
     async def map_repository(self, project_name: str, source_path: str, repository_profile: dict, repository_artifacts: dict, preset: str) -> dict:
         parsed = await self._chat_json(
@@ -169,6 +165,164 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             "analysis_brief": normalize_analysis_brief(parsed),
         }
 
+    async def run_penetration_test(self, penetration_context: dict) -> dict:
+        findings = penetration_context.get("findings", [])
+        if not isinstance(findings, list) or not findings:
+            return {
+                "review_note": "",
+                "executive_summary": "",
+                "attack_chains": [],
+                "reproduction_plan": [],
+                "analysis_limitations": [],
+                "next_steps": [],
+                "benchmark": {
+                    "findings_covered": 0,
+                    "paths_exercised": 0,
+                    "confidence_average": 0,
+                    "benchmark_summary": "",
+                },
+                "finding_overrides": [],
+            }
+
+        parsed: dict | None = None
+        attempt_profiles = (
+            {
+                "max_tokens": 2048,
+                "findings_limit": 20,
+                "repository_map": penetration_context.get("repository_map", {}),
+            },
+            {
+                "max_tokens": 1536,
+                "findings_limit": 12,
+                "repository_map": _compact_penetration_repository_map(penetration_context.get("repository_map", {})),
+            },
+        )
+        for attempt_index, profile in enumerate(attempt_profiles):
+            try:
+                parsed = await self._chat_json(
+                    task_name="penetration_test",
+                    max_tokens=int(profile["max_tokens"]),
+                    messages=[
+                        {"role": "system", "content": load_prompt_pack("penetration_tester_prompt.md")},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Project: {penetration_context.get('project_name', '')}\n"
+                                f"Source: {penetration_context.get('source_path', '')}\n"
+                                f"Preset: {penetration_context.get('preset', '')}\n"
+                                f"Scan mode: {penetration_context.get('scan_mode', '')}\n"
+                                f"Repository profile JSON: {json_for_task_prompt('penetration_test', 'repository_profile', penetration_context.get('repository_profile', {}), max_chars=1400)}\n"
+                                f"Repository map JSON: {json_for_task_prompt('penetration_test', 'repository_map', profile['repository_map'], max_chars=2200)}\n"
+                                f"Sandbox JSON: {json_for_task_prompt('penetration_test', 'sandbox', penetration_context.get('sandbox', {}), max_chars=1200)}\n"
+                                f"Validated findings JSON: {json_for_task_prompt('penetration_test', 'validated_findings', compact_findings(findings, limit=int(profile['findings_limit'])), max_chars=2800)}"
+                            ),
+                        },
+                    ],
+                )
+                break
+            except ExternalAIServiceError as exc:
+                if attempt_index >= len(attempt_profiles) - 1 or not exc.retryable:
+                    raise
+                logger.warning(
+                    "Penetration report request failed on attempt %s; retrying with compact context",
+                    attempt_index + 1,
+                    exc_info=exc,
+                )
+                await asyncio.sleep(min(1.2 * (attempt_index + 1), 3.0))
+
+        if parsed is None:
+            raise ExternalAIServiceError(
+                "NVIDIA did not return a penetration report for the current findings.",
+                provider=self.provider_name,
+                retryable=True,
+                failure_kind="runtime",
+            )
+
+        benchmark = parsed.get("benchmark", {}) if isinstance(parsed.get("benchmark"), dict) else {}
+        finding_overrides = parsed.get("finding_overrides", [])
+        normalized_overrides: list[dict] = []
+        if isinstance(finding_overrides, list):
+            for item in finding_overrides[:24]:
+                if not isinstance(item, dict):
+                    continue
+                normalized_overrides.append(
+                    {
+                        "file": str(item.get("file", "")).strip(),
+                        "line": int(item.get("line", 0) or 0),
+                        "title": str(item.get("title", "")).strip(),
+                        "attack_input": str(item.get("attack_input", "")).strip(),
+                        "attack_execution": str(item.get("attack_execution", "")).strip(),
+                        "attack_result": str(item.get("attack_result", "")).strip(),
+                        "explanation": str(item.get("explanation", "")).strip(),
+                        "audit_log": [str(entry).strip() for entry in item.get("audit_log", []) if str(entry).strip()][:6],
+                    }
+                )
+
+        default_confidence = _average_finding_confidence(findings)
+        findings_covered = _coerce_positive_int(benchmark.get("findings_covered"), fallback=len(findings))
+        if findings_covered == 0 and findings:
+            findings_covered = len(findings)
+        paths_exercised = _coerce_positive_int(benchmark.get("paths_exercised"), fallback=findings_covered)
+        if paths_exercised == 0 and findings_covered > 0:
+            paths_exercised = findings_covered
+        confidence_average = _coerce_percentage(benchmark.get("confidence_average"), fallback=default_confidence)
+        if confidence_average == 0 and default_confidence > 0:
+            confidence_average = default_confidence
+        benchmark_summary = shorten(str(benchmark.get("benchmark_summary", "")).strip(), width=220, placeholder="...")
+        if not benchmark_summary:
+            benchmark_summary = (
+                f"Validated {findings_covered} finding(s) and exercised {paths_exercised} path(s) "
+                "in controlled penetration simulation."
+            )
+
+        review_note = shorten(str(parsed.get("review_note", "")).strip(), width=180, placeholder="...")
+        if not review_note:
+            review_note = "Penetration report returned limited structured output; defaults were normalized from validated findings."
+        executive_summary = shorten(str(parsed.get("executive_summary", "")).strip(), width=320, placeholder="...")
+        if not executive_summary:
+            executive_summary = (
+                "Controlled penetration simulation completed with normalized fallback fields derived from validated findings."
+            )
+        attack_chains = [str(item).strip() for item in parsed.get("attack_chains", []) if str(item).strip()][:8]
+        if not attack_chains:
+            attack_chains = [
+                f"{str(item.get('title', 'Finding')).strip()} -> {str(item.get('file', '')).strip()}:{_coerce_positive_int(item.get('line', 0), fallback=0)}"
+                for item in findings[:3]
+                if str(item.get("file", "")).strip()
+            ]
+        reproduction_plan = [str(item).strip() for item in parsed.get("reproduction_plan", []) if str(item).strip()][:8]
+        if not reproduction_plan:
+            reproduction_plan = [
+                "Re-run this finding in isolated staging with non-production data and controlled inputs.",
+                "Capture request/response traces and verify sink reachability before applying the fix.",
+            ]
+        analysis_limitations = [str(item).strip() for item in parsed.get("analysis_limitations", []) if str(item).strip()][:8]
+        if not analysis_limitations:
+            analysis_limitations = [
+                "Model output was partially empty; benchmark and context were normalized from validated findings.",
+            ]
+        next_steps = [str(item).strip() for item in parsed.get("next_steps", []) if str(item).strip()][:8]
+        if not next_steps:
+            next_steps = [
+                "Apply remediation patch and re-run validation to verify closure.",
+            ]
+
+        return {
+            "review_note": review_note,
+            "executive_summary": executive_summary,
+            "attack_chains": attack_chains,
+            "reproduction_plan": reproduction_plan,
+            "analysis_limitations": analysis_limitations,
+            "next_steps": next_steps,
+            "benchmark": {
+                "findings_covered": findings_covered,
+                "paths_exercised": paths_exercised,
+                "confidence_average": confidence_average,
+                "benchmark_summary": benchmark_summary,
+            },
+            "finding_overrides": normalized_overrides,
+        }
+
     async def explain_finding(self, remediation_context: dict) -> dict:
         parsed = await self._chat_json(
             task_name="explain",
@@ -226,7 +380,6 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         )
 
     async def _chat_json(self, *, task_name: str, max_tokens: int, messages: list[dict]) -> dict:
-        target = self._target_for_task(task_name)
         token_budgets = [max_tokens]
         expanded_budget = min(max(max_tokens * 2, 1536), 4096)
         if expanded_budget > max_tokens:
@@ -237,8 +390,8 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             content = await self._chat_text(
                 task_name=task_name,
                 max_tokens=token_budget,
-                messages=_force_json_only_messages(messages) if target.provider_name == "routing_run" else messages,
-                expect_json=target.provider_name != "routing_run",
+                messages=messages,
+                expect_json=True,
             )
             if content:
                 raw_responses.append(content)
@@ -262,7 +415,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
 
         raise ExternalAIServiceError(
             "The configured AI provider returned a completion without JSON content for this task.",
-            provider=self._target_for_task(task_name).provider_name,
+            provider=self.provider_name,
             retryable=True,
             failure_kind="output_format",
         )
@@ -282,10 +435,6 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         elif target.enable_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": True}
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {target.api_key}",
-        }
         url = _chat_completions_url(target.base_url)
         logger.info(
             "AI request dispatch | task=%s provider=%s model=%s url=%s expect_json=%s max_tokens=%s",
@@ -296,34 +445,83 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             expect_json,
             max_tokens,
         )
-        try:
-            async with httpx.AsyncClient(timeout=target.timeout_seconds) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                body = response.json()
-        except httpx.TimeoutException as exc:
-            raise ExternalAIServiceError(
-                _provider_timeout_message(target.provider_name),
-                provider=target.provider_name,
-                retryable=True,
-                failure_kind="timeout",
-            ) from exc
-        except httpx.ConnectError as exc:
-            raise ExternalAIServiceError(
-                _provider_connection_message(target.provider_name),
-                provider=target.provider_name,
-                retryable=True,
-                failure_kind="connection",
-            ) from exc
-        except httpx.HTTPStatusError as exc:
-            raise _map_provider_http_error(target.provider_name, exc.response) from exc
-        except httpx.HTTPError as exc:
+        last_error: ExternalAIServiceError | None = None
+        body: dict | None = None
+
+        total_rounds = max(1, int(self.retry_attempts))
+        for round_index in range(total_rounds):
+            ordered_api_keys = self._ordered_api_keys(target)
+            for api_key in ordered_api_keys:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                }
+                try:
+                    async with httpx.AsyncClient(timeout=target.timeout_seconds) as client:
+                        response = await client.post(url, json=payload, headers=headers)
+                        response.raise_for_status()
+                        body = response.json()
+                        break
+                except httpx.TimeoutException as exc:
+                    last_error = ExternalAIServiceError(
+                        _provider_timeout_message(target.provider_name),
+                        provider=target.provider_name,
+                        retryable=True,
+                        failure_kind="timeout",
+                    )
+                    if len(ordered_api_keys) > 1:
+                        continue
+                    if round_index >= total_rounds - 1:
+                        raise last_error from exc
+                except httpx.ConnectError as exc:
+                    last_error = ExternalAIServiceError(
+                        _provider_connection_message(target.provider_name),
+                        provider=target.provider_name,
+                        retryable=True,
+                        failure_kind="connection",
+                    )
+                    if len(ordered_api_keys) > 1:
+                        continue
+                    if round_index >= total_rounds - 1:
+                        raise last_error from exc
+                except httpx.HTTPStatusError as exc:
+                    last_error = _map_provider_http_error(target.provider_name, exc.response)
+                    if not _should_try_next_key(last_error):
+                        raise last_error from exc
+                    if len(ordered_api_keys) > 1:
+                        continue
+                    if round_index >= total_rounds - 1:
+                        raise last_error from exc
+                except httpx.HTTPError as exc:
+                    last_error = ExternalAIServiceError(
+                        _provider_runtime_message(target.provider_name),
+                        provider=target.provider_name,
+                        retryable=True,
+                        failure_kind="runtime",
+                    )
+                    if len(ordered_api_keys) > 1:
+                        continue
+                    if round_index >= total_rounds - 1:
+                        raise last_error from exc
+
+            if body is not None:
+                break
+            if last_error is None:
+                break
+            if round_index >= total_rounds - 1 or not last_error.retryable:
+                raise last_error
+            if self.retry_backoff_seconds > 0:
+                await asyncio.sleep(min(self.retry_backoff_seconds * (2**round_index), 15.0))
+
+        if body is None:
+            if last_error is not None:
+                raise last_error
             raise ExternalAIServiceError(
                 _provider_runtime_message(target.provider_name),
                 provider=target.provider_name,
                 retryable=True,
                 failure_kind="runtime",
-            ) from exc
+            )
 
         choices = body.get("choices", [])
         if not choices:
@@ -344,15 +542,20 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         )
 
     def _target_for_task(self, task_name: str) -> _ProviderTarget:
-        if task_name.strip().lower() in _DEPTH_TASKS:
-            return self._large_target
-        return self._small_target
+        return _ProviderTarget(
+            provider_name=self.provider_name,
+            base_url=self.base_url,
+            api_keys=self.api_keys,
+            timeout_seconds=float(self.request_timeout_seconds),
+            model=self.model_router.route(task_name),
+            enable_thinking=self.enable_thinking,
+        )
 
     async def _repair_json_response(self, *, task_name: str, messages: list[dict], raw_responses: list[str]) -> dict:
         if not raw_responses:
             return {}
 
-        repair_target = self._small_target
+        repair_target = self._target_for_task("json_repair")
         repair_messages = _build_json_repair_messages(task_name=task_name, messages=messages, raw_response=raw_responses[-1])
         repair_budget = min(max(1024, len(raw_responses[-1]) // 2), 2048)
 
@@ -360,10 +563,19 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             task_name=f"{task_name}_json_repair",
             max_tokens=repair_budget,
             messages=repair_messages,
-            expect_json=repair_target.provider_name != "routing_run",
+            expect_json=True,
             target=repair_target,
         )
         return extract_json(content)
+
+    def _ordered_api_keys(self, target: _ProviderTarget) -> list[str]:
+        api_keys = list(target.api_keys)
+        if len(api_keys) <= 1:
+            return api_keys
+
+        cursor = self._api_key_cursor % len(api_keys)
+        self._api_key_cursor = (cursor + 1) % len(api_keys)
+        return [*api_keys[cursor:], *api_keys[:cursor]]
 
 
 def _coerce_message_text(value) -> str:
@@ -517,91 +729,111 @@ def _chat_completions_url(base_url: str) -> str:
     return f"{normalized}/chat/completions"
 
 
-def _resolve_provider_target(settings, *, tier: str, fallback: _ProviderTarget | None = None) -> _ProviderTarget:
-    provider_name = _resolve_provider_name(settings, tier=tier)
-    if provider_name not in _SUPPORTED_TARGET_PROVIDERS:
-        raise RuntimeError(f"Unsupported AI target provider '{provider_name}' for {tier} tier.")
-
-    if provider_name == "nvidia":
-        model = _resolve_nvidia_model(settings, tier=tier)
-        api_key = settings.nvidia_api_key
-        if not api_key:
-            if fallback is not None:
-                return fallback
-            raise RuntimeError("NVIDIA is not configured. Set NVIDIA_API_KEY.")
-        return _ProviderTarget(
-            provider_name="nvidia",
-            base_url=settings.nvidia_base_url.rstrip("/"),
-            api_key=api_key,
-            timeout_seconds=120.0,
-            model=model,
-            enable_thinking=settings.nvidia_enable_thinking,
-        )
-
-    model = _resolve_routing_run_model(settings, tier=tier)
-    api_key = settings.builder_chat_api_key
-    if not api_key:
-        if fallback is not None:
-            return fallback
-        raise RuntimeError("routing.run is not configured. Set BUILDER_CHAT_API_KEY.")
-    return _ProviderTarget(
-        provider_name="routing_run",
-        base_url=settings.builder_chat_base_url,
-        api_key=api_key,
-        timeout_seconds=settings.builder_chat_timeout_seconds,
-        model=model,
-        enable_thinking=False,
-    )
-
-
-def _resolve_provider_name(settings, *, tier: str) -> str:
-    if tier == "small":
-        return settings.ai_small_provider or "nvidia"
-
-    if settings.ai_large_provider:
-        return settings.ai_large_provider
-    if settings.builder_chat_api_key:
-        return "routing_run"
-    if settings.ai_large_model:
-        return settings.ai_large_provider or "nvidia"
-    if settings.nvidia_large_model:
-        return "nvidia"
-    return settings.ai_small_provider or "nvidia"
-
-
 def _resolve_nvidia_model(settings, *, tier: str) -> str:
     if tier == "small":
         return settings.ai_small_model or settings.nvidia_small_model or settings.nvidia_model
     return settings.ai_large_model or settings.nvidia_large_model or settings.nvidia_model
 
 
-def _resolve_routing_run_model(settings, *, tier: str) -> str:
-    if tier == "small":
-        return settings.ai_small_model or settings.builder_chat_model
-    return settings.ai_large_model or settings.builder_chat_model
+def _resolve_nvidia_api_keys(settings) -> tuple[str, ...]:
+    raw_keys = []
+    if settings.nvidia_api_keys:
+        raw_keys.extend(settings.nvidia_api_keys)
+    if settings.nvidia_api_key:
+        raw_keys.append(settings.nvidia_api_key)
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_keys:
+        key = str(item).strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        normalized.append(key)
+    return tuple(normalized)
+
+
+def _compact_penetration_repository_map(repository_map: object) -> dict:
+    if not isinstance(repository_map, dict):
+        return {}
+    compact_map = {
+        "review_note": str(repository_map.get("review_note", "")).strip(),
+        "coverage_note": str(repository_map.get("coverage_note", "")).strip(),
+        "trust_boundaries": [str(item).strip() for item in repository_map.get("trust_boundaries", []) if str(item).strip()][:6],
+    }
+    priority_paths = repository_map.get("priority_paths", [])
+    if isinstance(priority_paths, list):
+        compact_map["priority_paths"] = [item for item in priority_paths if isinstance(item, dict)][:6]
+    else:
+        compact_map["priority_paths"] = []
+    return compact_map
+
+
+def _coerce_positive_int(value: object, *, fallback: int = 0) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return max(0, int(fallback))
+
+
+def _coerce_percentage(value: object, *, fallback: int = 0) -> int:
+    try:
+        parsed = int(value or 0)
+    except (TypeError, ValueError):
+        parsed = int(fallback)
+    return max(0, min(100, parsed))
+
+
+def _average_finding_confidence(findings: list[dict]) -> int:
+    confidences: list[int] = []
+    for item in findings:
+        if not isinstance(item, dict):
+            continue
+        try:
+            confidences.append(max(0, min(100, int(item.get("confidence", 0) or 0))))
+        except (TypeError, ValueError):
+            continue
+    if not confidences:
+        return 0
+    return int(round(sum(confidences) / len(confidences)))
+
+
+def _build_task_model_overrides(settings) -> dict[str, str]:
+    detection_model = settings.nvidia_detection_model or settings.nvidia_model
+    explain_model = settings.nvidia_explain_model or settings.nvidia_large_model or settings.nvidia_model
+    fix_model = settings.nvidia_fix_model or settings.nvidia_model
+    validation_model = settings.nvidia_validation_model or settings.nvidia_large_model or settings.nvidia_model
+    penetration_model = settings.nvidia_penetration_model or settings.nvidia_model
+
+    return {
+        "repository_map": detection_model,
+        "path_review": detection_model,
+        "finding_validate": detection_model,
+        "verdict": detection_model,
+        "explain": explain_model,
+        "fix_draft": fix_model,
+        "fix_retry": fix_model,
+        "fix_validate": validation_model,
+        "patch_validate": validation_model,
+        "final_patch": validation_model,
+        "json_repair": validation_model,
+        "penetration_test": penetration_model,
+    }
 
 
 def _provider_timeout_message(provider_name: str) -> str:
-    if provider_name == "routing_run":
-        return "Routing.run timed out while processing the request. Retry shortly."
     return "NVIDIA timed out while processing the request. Retry shortly."
 
 
 def _provider_connection_message(provider_name: str) -> str:
-    if provider_name == "routing_run":
-        return "Aegix could not reach routing.run. Check network access and retry."
     return "Aegix could not reach NVIDIA. Check network access and retry."
 
 
 def _provider_runtime_message(provider_name: str) -> str:
-    if provider_name == "routing_run":
-        return "routing.run could not complete the request because of an upstream runtime failure."
     return "NVIDIA could not complete the request because of an upstream runtime failure."
 
 
 def _provider_output_message(provider_name: str) -> str:
-    if provider_name == "routing_run":
-        return "routing.run returned a completion without usable content."
     return "NVIDIA returned a completion without usable content."
 
 
@@ -613,7 +845,7 @@ def _map_provider_http_error(provider_name: str, response: httpx.Response) -> Ex
     message = _extract_provider_message(body)
     normalized = message.lower()
     status_code = response.status_code
-    provider_label = "routing.run" if provider_name == "routing_run" else "NVIDIA"
+    provider_label = "NVIDIA"
 
     if status_code == 429:
         return ExternalAIServiceError(
@@ -654,3 +886,9 @@ def _map_provider_http_error(provider_name: str, response: httpx.Response) -> Ex
         status_code=status_code,
         failure_kind="request_rejected",
     )
+
+
+def _should_try_next_key(error: ExternalAIServiceError) -> bool:
+    if error.status_code in {401, 403, 429, 500, 502, 503, 504}:
+        return True
+    return error.retryable and error.failure_kind in {"timeout", "connection", "runtime", "rate_limit", "gateway", "upstream"}
