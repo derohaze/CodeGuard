@@ -165,9 +165,7 @@ class BenchmarkRunner:
             from app.core.config import get_settings
 
             settings = get_settings()
-
-            # Build a minimal AI client
-            ai_client = NvidiaSecurityClient(settings)
+            ai_client = NvidiaSecurityClient()
             if not ai_client.is_configured(settings):
                 raise RuntimeError("NVIDIA_API_KEY not configured. Cannot run benchmark without AI credentials.")
 
@@ -204,6 +202,8 @@ class BenchmarkRunner:
         """Extract confirmed findings from agent history."""
         findings = []
         for msg in history:
+            if not isinstance(msg, dict):
+                continue
             content = msg.get("content", "")
             if isinstance(content, str):
                 # Try to parse JSON report
@@ -266,10 +266,11 @@ class BenchmarkRunner:
                 severity_counts[sev] += 1
 
         # Steps and tool calls
-        steps_used = len([m for m in history if m.get("role") == "assistant"])
+        dict_history = [m for m in history if isinstance(m, dict)]
+        steps_used = len([m for m in dict_history if m.get("role") == "assistant"])
         tool_calls = sum(
             len(m.get("tool_calls", []) or [])
-            for m in history
+            for m in dict_history
             if m.get("role") == "assistant"
         )
 
@@ -283,7 +284,7 @@ class BenchmarkRunner:
 
         # Report quality (simplified: check if executive summary, steps, etc.)
         report_quality = 0.0
-        for msg in reversed(history):
+        for msg in reversed(dict_history):
             content = msg.get("content", "")
             if isinstance(content, str) and len(content) > 200:
                 quality_score = 0
@@ -419,17 +420,16 @@ class BenchmarkRunner:
         """Restore prompt files from git HEAD (before our changes)."""
         import subprocess
         prompts_dir = self._prompts_dir()
-        result = subprocess.run(
-            ["git", "show", f"HEAD:{prompts_dir.relative_to(Path.cwd())}"],
-            capture_output=True, text=True, cwd=Path.cwd()
-        )
-        # Alternative: git checkout individual files
         for md_file in prompts_dir.glob("*.md"):
-            rel = md_file.relative_to(Path.cwd())
-            subprocess.run(
-                ["git", "checkout", "HEAD", "--", str(rel)],
-                capture_output=True, cwd=Path.cwd()
+            rel = md_file.relative_to(Path.cwd()).as_posix()
+            result = subprocess.run(
+                ["git", "show", f"HEAD:{rel}"],
+                capture_output=True,
+                text=True,
+                cwd=Path.cwd(),
             )
+            if result.returncode == 0:
+                md_file.write_text(result.stdout, encoding="utf-8")
 
     def _restore_stashed_prompts(self) -> None:
         import shutil

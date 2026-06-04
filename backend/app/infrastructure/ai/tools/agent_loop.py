@@ -21,8 +21,9 @@ class AgentLoopError(Exception):
 
 
 class MaxStepsError(AgentLoopError):
-    def __init__(self, steps: int):
+    def __init__(self, steps: int, history: list[dict] | None = None):
         super().__init__(f"agent reached max steps ({steps})")
+        self.history = history or []
 
 
 class InteractiveAgentLoop:
@@ -88,7 +89,7 @@ class InteractiveAgentLoop:
                         parsed_args = args_raw or {}
                     self._handle_skill_activation(parsed_args)
 
-        raise MaxStepsError(MAX_STEPS)
+        raise MaxStepsError(MAX_STEPS, history)
 
     def _parse_response(self, response: Any) -> dict:
         if isinstance(response, dict):

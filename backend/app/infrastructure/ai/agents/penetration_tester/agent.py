@@ -99,7 +99,7 @@ class PenetrationTestAgent:
             )
         except MaxStepsError as exc:
             logger.warning("interactive agent reached max steps: %s", exc)
-            history = []
+            history = exc.history
 
         return history
 

@@ -75,6 +75,23 @@ class TestToolRegistry:
         assert not result.success
         assert "ValueError" in (result.error or "")
 
+    @pytest.mark.asyncio
+    async def test_execute_rejects_unknown_schema_arguments(self):
+        reg = ToolRegistry()
+        tool = _make_tool("strict")
+        tool.input_schema = {
+            "type": "object",
+            "properties": {"notes": {"type": "string"}},
+        }
+        tool.run = AsyncMock(return_value=ToolResult.ok("accepted"))  # type: ignore
+        reg.register(tool)
+
+        result = await reg.execute("strict", {"notes0": "typo"})
+
+        assert not result.success
+        assert "unexpected argument" in (result.error or "")
+        tool.run.assert_not_awaited()
+
     def test_register_empty_name_raises(self):
         reg = ToolRegistry()
         with pytest.raises(ValueError, match="must have a name"):

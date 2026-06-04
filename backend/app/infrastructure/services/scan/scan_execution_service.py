@@ -20,6 +20,7 @@ from app.infrastructure.services.scan.duplicate_clustering import cluster_findin
 from app.infrastructure.services.repository.evidence_extraction import extract_evidence
 from app.infrastructure.services.repository.framework_detection import detect_framework_profile
 from app.infrastructure.services.repository.path_tracing import trace_candidate_paths
+from app.infrastructure.services.repository.codeql_lite import build_program_database, run_codeql_lite_queries
 from app.infrastructure.services.repository.rust_indexer import build_native_index
 from app.infrastructure.services.repository.repository_analysis import (
     adaptive_chunk_work_items,
@@ -148,6 +149,8 @@ def build_scan_analysis_context(
     repository_graph = build_repository_graph(source_root, files, framework_profile)
     security_registry = build_source_sink_registry(source_root, files, framework_profile)
     traced_paths = trace_candidate_paths(source_root, repository_graph, security_registry, files)
+    program_database = build_program_database(source_root, files)
+    codeql_lite_findings = run_codeql_lite_queries(program_database)
     file_segments = build_file_segments(files, source_root, scan_mode=scan_mode)
     native_index = build_native_index(source_root)
     return {
@@ -155,6 +158,8 @@ def build_scan_analysis_context(
         "repository_graph": repository_graph,
         "security_registry": security_registry,
         "traced_paths": traced_paths,
+        "program_database": program_database.to_dict(),
+        "codeql_lite_findings": codeql_lite_findings,
         "file_segments": file_segments,
         "native_index": native_index,
     }
@@ -306,6 +311,8 @@ class ScanExecutionService:
                 repository_graph = analysis_context["repository_graph"]
                 security_registry = analysis_context["security_registry"]
                 traced_paths = analysis_context["traced_paths"]
+                program_database = analysis_context["program_database"]
+                codeql_lite_findings = analysis_context["codeql_lite_findings"]
                 file_segments = analysis_context["file_segments"]
                 native_index = analysis_context["native_index"]
                 self._set_cached_analysis(
@@ -315,6 +322,8 @@ class ScanExecutionService:
                         "repository_graph": repository_graph,
                         "security_registry": security_registry,
                         "traced_paths": traced_paths,
+                        "program_database": program_database,
+                        "codeql_lite_findings": codeql_lite_findings,
                         "file_segments": file_segments,
                         "native_index": native_index,
                     },
@@ -325,6 +334,8 @@ class ScanExecutionService:
                 repository_graph = cached_analysis["repository_graph"]
                 security_registry = cached_analysis["security_registry"]
                 traced_paths = cached_analysis["traced_paths"]
+                program_database = cached_analysis.get("program_database", {"summary": {"nodes": 0, "edges": 0, "functions": 0}})
+                codeql_lite_findings = cached_analysis.get("codeql_lite_findings", [])
                 file_segments = cached_analysis["file_segments"]
                 native_index = cached_analysis.get("native_index", {"available": False, "engine": "rust-indexer", "reason": "cache_legacy"})
                 logger.info(
@@ -336,6 +347,7 @@ class ScanExecutionService:
                 logs.append("Reused incremental analysis cache for repository graph and path tracing.")
             excluded_review_file_count = sum(1 for item in file_segments if int(item.get("block_count", 0)) == 0)
             heuristic_candidates = await asyncio.to_thread(collect_heuristic_candidates, files, source_root)
+            heuristic_candidates.extend(codeql_lite_findings)
             repository_inventory = build_repository_inventory(profile, files)
 
             logs.append(f"Indexed {profile['file_count']} code files across {profile['directory_count']} directories.")
@@ -381,6 +393,12 @@ class ScanExecutionService:
                 f"Built repository graphs with {repository_graph['summary']['import_edges']} import edges, "
                 f"{repository_graph['summary']['route_files']} route nodes, and "
                 f"{traced_paths['summary']['candidate_path_count']} candidate source-to-sink paths."
+            )
+            logs.append(
+                "Built CodeQL-lite Program DB with "
+                f"{program_database.get('summary', {}).get('nodes', 0)} nodes, "
+                f"{program_database.get('summary', {}).get('edges', 0)} edges, and "
+                f"{len(codeql_lite_findings)} query result(s)."
             )
             if file_segments:
                 logs.append(
@@ -1451,7 +1469,7 @@ def merge_validated_findings(validated_findings: list[dict], heuristic_candidate
         merged.append(item)
 
     for item in heuristic_candidates:
-        if int(item.get("confidence", 0)) < 80:
+        if not _is_locally_confirmed_candidate(item):
             continue
         key = build_candidate_key(item)
         if key in seen:
@@ -1460,6 +1478,24 @@ def merge_validated_findings(validated_findings: list[dict], heuristic_candidate
         merged.append(item)
 
     return merged
+
+
+def _is_locally_confirmed_candidate(item: dict) -> bool:
+    return (
+        str(item.get("local_validation", "")).strip().lower() == "confirmed"
+        and bool(str(item.get("source_hint", "")).strip())
+        and bool(str(item.get("sink_hint", "")).strip())
+        and bool(str(item.get("path_hint", "")).strip())
+        and _candidate_confidence(item) >= 90
+        and not bool(item.get("has_sanitizer"))
+    )
+
+
+def _candidate_confidence(item: dict) -> int:
+    try:
+        return int(item.get("confidence", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def build_repository_map_fallback(
@@ -1891,16 +1927,11 @@ def attach_path_context(findings: list[dict], traced_paths: dict) -> list[dict]:
     if not findings:
         return []
     path_lookup = {(item["sink"]["file"], int(item["sink"]["line"])): item for item in traced_paths.get("paths", [])}
-    fallback_paths_by_file: dict[str, dict] = {}
-    for item in traced_paths.get("paths", []):
-        fallback_paths_by_file.setdefault(item["sink"]["file"], item)
 
     enriched_findings: list[dict] = []
     for item in findings:
         enriched = dict(item)
         candidate_path = path_lookup.get((str(item.get("file", "")), int(item.get("line", 1))))
-        if candidate_path is None:
-            candidate_path = fallback_paths_by_file.get(str(item.get("file", "")))
         if candidate_path:
             enriched["path_hint"] = str(candidate_path.get("path_hint", ""))
             enriched["source_hint"] = f"{candidate_path['source']['file']}:{candidate_path['source']['line']}"
@@ -1941,7 +1972,7 @@ def filter_validated_findings(
         if not source_hint or not sink_hint or not path_hint or not evidence["snippet"]:
             continue
         traced_path = valid_paths.get(path_hint)
-        if valid_paths and traced_path is None:
+        if valid_paths and traced_path is None and str(item.get("source", "")) != "codeql_lite":
             continue
         if traced_path and traced_path.get("has_sanitizer") and int(item.get("confidence", 0)) < 90:
             continue
@@ -2063,6 +2094,8 @@ def promote_cross_file_candidates(
     for item in candidate_findings:
         key = build_candidate_key(item)
         if key in validated_keys:
+            continue
+        if not _is_locally_confirmed_candidate(item):
             continue
         path_hint = str(item.get("path_hint", "")).strip()
         traced = traced_lookup.get(path_hint)

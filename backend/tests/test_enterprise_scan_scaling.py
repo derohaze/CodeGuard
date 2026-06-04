@@ -5,6 +5,11 @@ from pathlib import Path
 from app.infrastructure.services.repository import repository_analysis
 from app.infrastructure.services.repository.repository_analysis import collect_files_with_stats
 from app.infrastructure.services.scan.segmentation_planning import build_scan_work_units
+from app.infrastructure.services.scan.scan_execution_service import (
+    attach_path_context,
+    merge_validated_findings,
+    promote_cross_file_candidates,
+)
 
 
 def test_collect_files_skips_heavy_and_test_directories(tmp_path: Path) -> None:
@@ -90,3 +95,94 @@ def test_deep_scan_work_units_are_bounded(tmp_path: Path) -> None:
     assert len(work_units["review_items"]) <= 1_200
     assert len(reviewed_files) <= 240
     assert max(reviewed_files.values()) <= 8
+
+
+def test_heuristic_candidates_are_not_promoted_without_local_confirmation() -> None:
+    heuristic_candidate = {
+        "source": "heuristic",
+        "severity": "high",
+        "title": "Dynamic NoSQL query construction may allow operator injection",
+        "file": "repositories/catalog/repository.py",
+        "line": 42,
+        "category": "NoSQL injection",
+        "confidence": 95,
+        "source_hint": "repositories/catalog/repository.py:10",
+        "sink_hint": "repositories/catalog/repository.py:42",
+        "path_hint": "repositories/catalog/repository.py",
+    }
+
+    assert merge_validated_findings([], [heuristic_candidate]) == []
+
+
+def test_locally_confirmed_candidates_require_complete_path_proof() -> None:
+    confirmed_candidate = {
+        "source": "heuristic",
+        "local_validation": "confirmed",
+        "severity": "critical",
+        "title": "User-controlled input reaches command execution",
+        "file": "app.py",
+        "line": 12,
+        "category": "Command injection",
+        "confidence": 92,
+        "source_hint": "app.py:8",
+        "sink_hint": "app.py:12",
+        "path_hint": "app.py",
+        "has_sanitizer": False,
+    }
+
+    assert merge_validated_findings([], [confirmed_candidate]) == [confirmed_candidate]
+
+
+def test_path_context_requires_exact_sink_line_match() -> None:
+    candidate = {
+        "source": "heuristic",
+        "file": "repositories/catalog/repository.py",
+        "line": 50,
+        "title": "Dynamic NoSQL query construction may allow operator injection",
+    }
+    traced_paths = {
+        "paths": [
+            {
+                "source": {"file": "repositories/catalog/repository.py", "line": 10},
+                "sink": {"file": "repositories/catalog/repository.py", "line": 20},
+                "path_hint": "repositories/catalog/repository.py",
+                "line_sequence": [10, 20],
+                "has_sanitizer": False,
+                "confidence": 88,
+            }
+        ]
+    }
+
+    assert attach_path_context([candidate], traced_paths)[0] == candidate
+
+
+def test_cross_file_promotion_does_not_bypass_validation_for_heuristics(tmp_path: Path) -> None:
+    target = tmp_path / "repo.py"
+    target.write_text("\n".join(f"line_{index}" for index in range(1, 20)), encoding="utf-8")
+    candidate = {
+        "source": "heuristic",
+        "severity": "high",
+        "title": "Dynamic query construction may allow injection",
+        "file": "repo.py",
+        "line": 12,
+        "category": "SQL injection",
+        "confidence": 95,
+        "source_hint": "api.py:3",
+        "sink_hint": "repo.py:12",
+        "path_hint": "api.py -> repo.py",
+        "path_line_sequence": [3, 12],
+        "has_sanitizer": False,
+    }
+    traced_paths = {
+        "paths": [
+            {
+                "source": {"file": "api.py", "line": 3},
+                "sink": {"file": "repo.py", "line": 12},
+                "path_hint": "api.py -> repo.py",
+                "path_type": "cross_file",
+                "has_sanitizer": False,
+            }
+        ]
+    }
+
+    assert promote_cross_file_candidates([], [candidate], tmp_path, [target], traced_paths) == []

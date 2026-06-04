@@ -45,8 +45,26 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if not tool:
             return ToolResult.fail(f'unknown tool "{name}"')
+        unexpected_args = _unexpected_tool_args(tool, args or {})
+        if unexpected_args:
+            allowed_args = ", ".join(sorted((tool.input_schema.get("properties") or {}).keys()))
+            return ToolResult.fail(
+                f'tool "{name}" received unexpected argument(s): {", ".join(unexpected_args)}. '
+                f"Allowed arguments: {allowed_args or 'none'}"
+            )
         try:
             return await tool.run(**(args or {}))
         except Exception as exc:
             logger.exception("tool %s failed", name)
             return ToolResult.fail(f"{type(exc).__name__}: {exc}")
+
+
+def _unexpected_tool_args(tool: BaseTool, args: dict[str, Any]) -> list[str]:
+    schema = tool.input_schema if isinstance(tool.input_schema, dict) else {}
+    if schema.get("type") != "object" or schema.get("additionalProperties") is True:
+        return []
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return []
+    allowed = {str(key) for key in properties}
+    return sorted(str(key) for key in args if str(key) not in allowed)

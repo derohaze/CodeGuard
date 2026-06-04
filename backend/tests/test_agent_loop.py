@@ -216,6 +216,27 @@ class TestAgentLoopRun:
             await loop.run([{"role": "user", "content": "loop forever"}])
 
     @pytest.mark.asyncio
+    async def test_max_steps_error_preserves_partial_history(self, tool_registry):
+        """Max-step failures still expose tool calls and evidence collected so far."""
+        mock = AsyncMock(return_value={
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {"id": "c1", "name": "confirm_finding", "type": "function", "arguments": '{"title":"SQL Injection","severity":"high","endpoint":"/api/users","description":"confirmed"}'},
+            ],
+        })
+        loop = InteractiveAgentLoop(tool_registry, mock)
+
+        with pytest.raises(MaxStepsError) as exc_info:
+            await loop.run([{"role": "user", "content": "loop forever"}])
+
+        assert any(
+            msg.get("role") == "assistant" and msg.get("tool_calls")
+            for msg in exc_info.value.history
+            if isinstance(msg, dict)
+        )
+
+    @pytest.mark.asyncio
     async def test_unknown_tool_name_handled(self, tool_registry):
         """LLM calls tool that doesn't exist → fail result, no crash."""
         mock = AsyncMock(side_effect=[

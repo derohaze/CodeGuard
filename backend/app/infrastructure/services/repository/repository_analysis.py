@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import ast
 import hashlib
 import os
 import re
@@ -463,10 +464,10 @@ def run_precise_heuristics(path: Path, text: str, source_root: Path) -> list[dic
     if has_ssrf_signal(lowered):
         findings.append(make_finding_candidate(relative, text, "high", "User-controlled URL may reach outbound HTTP client", "Server-side request forgery"))
 
-    if has_sql_injection_signal(lowered):
+    if has_sql_injection_signal(text):
         findings.append(make_finding_candidate(relative, text, "high", "Dynamic query construction may allow injection", "SQL injection"))
 
-    if has_nosql_injection_signal(lowered):
+    if has_nosql_injection_signal(text):
         findings.append(make_finding_candidate(relative, text, "high", "Dynamic NoSQL query construction may allow operator injection", "NoSQL injection"))
 
     if has_graphql_sql_injection_signal(lowered):
@@ -761,7 +762,10 @@ def has_ssrf_signal(lowered: str) -> bool:
     return has_sink and has_source and not has_defense
 
 
-def has_sql_injection_signal(lowered: str) -> bool:
+def has_sql_injection_signal(text: str) -> bool:
+    lowered = text.lower()
+    if has_rust_sql_injection_signal(lowered):
+        return True
     has_query = any(
         token in lowered
         for token in (".execute(", ".query(", "cursor.execute(", "$where", "executequery(", "executeupdate(", "statement.execute(")
@@ -774,14 +778,166 @@ def has_sql_injection_signal(lowered: str) -> bool:
     return has_query and has_interpolation
 
 
-def has_nosql_injection_signal(lowered: str) -> bool:
-    has_query = any(
+def has_nosql_injection_signal(text: str) -> bool:
+    lowered = text.lower()
+    if has_python_mongo_operator_injection_signal(text):
+        return True
+    if has_node_mongo_operator_injection_signal(lowered):
+        return True
+    return False
+
+
+def has_python_mongo_operator_injection_signal(text: str) -> bool:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return False
+
+    tainted_structured_names = _python_structured_input_names(tree)
+    if not tainted_structured_names:
+        return False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        method_name = _python_call_method_name(node.func)
+        if method_name not in {"find", "find_one", "findone", "find_one_and_update", "find_one_and_delete", "update_one", "update_many", "aggregate"}:
+            continue
+        query_arg = node.args[0] if node.args else None
+        if query_arg is not None and _python_query_arg_allows_operator_injection(query_arg, tainted_structured_names):
+            return True
+    return False
+
+
+def _python_structured_input_names(tree: ast.AST) -> set[str]:
+    structured_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for arg in node.args.args:
+                if _python_annotation_is_structured(arg.annotation) or _name_suggests_structured_input(arg.arg):
+                    structured_names.add(arg.arg)
+        elif isinstance(node, ast.Assign):
+            value_names = set(_python_expr_names(node.value))
+            value_call = _python_call_method_name(node.value.func) if isinstance(node.value, ast.Call) else ""
+            value_is_structured_source = (
+                bool(value_names & structured_names)
+                or value_call in {"json", "dict", "model_dump", "body"}
+                or _python_expr_mentions_request_payload(node.value)
+            )
+            if not value_is_structured_source:
+                continue
+            for target in node.targets:
+                for name in _python_target_names(target):
+                    if _name_suggests_structured_input(name) or value_is_structured_source:
+                        structured_names.add(name)
+    return structured_names
+
+
+def _python_query_arg_allows_operator_injection(node: ast.AST, structured_names: set[str]) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id in structured_names
+    if isinstance(node, ast.Call):
+        if _python_call_method_name(node.func) in {"dict", "model_dump"}:
+            return any(_python_query_arg_allows_operator_injection(arg, structured_names) for arg in node.args)
+        return False
+    if not isinstance(node, ast.Dict):
+        return False
+
+    for key, value in zip(node.keys, node.values):
+        key_text = _python_constant_string(key)
+        if key_text in {"$eq"}:
+            continue
+        if key_text and key_text.startswith("$"):
+            if _python_query_arg_allows_operator_injection(value, structured_names):
+                return True
+            continue
+        if isinstance(value, ast.Name) and value.id in structured_names:
+            return True
+        if isinstance(value, ast.Dict) and _python_query_arg_allows_operator_injection(value, structured_names):
+            return True
+    return False
+
+
+def _python_annotation_is_structured(annotation: ast.AST | None) -> bool:
+    if annotation is None:
+        return False
+    text = ast.unparse(annotation).lower()
+    return any(token in text for token in ("dict", "mapping", "any", "json", "object"))
+
+
+def _name_suggests_structured_input(name: str) -> bool:
+    lowered = name.lower()
+    return any(
         token in lowered
-        for token in ("find({", "findone({", "updateone({", "aggregate([", "collection(", "$where", "$regex", "$or", "$ne")
+        for token in ("payload", "body", "filter", "filters", "query", "criteria", "selector", "document", "public_key", "jwk")
     )
-    has_source = any(token in lowered for token in INPUT_TOKENS + ("filter", "criteria", "selector"))
-    has_defense = any(token in lowered for token in ("$eq", "allowlist", "typed filter", "mongo-sanitize", "bson"))
-    return has_query and has_source and not has_defense
+
+
+def _python_expr_mentions_request_payload(node: ast.AST) -> bool:
+    return any(name in {"request", "req", "body", "payload"} for name in _python_expr_names(node))
+
+
+def _python_expr_names(node: ast.AST | None) -> list[str]:
+    if node is None:
+        return []
+    names: list[str] = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name):
+            names.append(child.id)
+        elif isinstance(child, ast.Attribute):
+            names.append(child.attr)
+    return list(dict.fromkeys(names))
+
+
+def _python_target_names(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Name):
+        return [node.id]
+    if isinstance(node, (ast.Tuple, ast.List)):
+        names: list[str] = []
+        for item in node.elts:
+            names.extend(_python_target_names(item))
+        return names
+    return []
+
+
+def _python_call_method_name(node: ast.AST | None) -> str:
+    if node is None:
+        return ""
+    if isinstance(node, ast.Name):
+        return node.id.lower()
+    if isinstance(node, ast.Attribute):
+        return node.attr.lower()
+    return ""
+
+
+def _python_constant_string(node: ast.AST | None) -> str:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return ""
+
+
+def has_node_mongo_operator_injection_signal(lowered: str) -> bool:
+    mongo_call = r"\b(?:find|findone|findoneandupdate|updateone|updatemany|aggregate)\s*\("
+    direct_body_filter = re.search(mongo_call + r"\s*(?:req|request)\.(?:body|query|params)\b", lowered)
+    if direct_body_filter:
+        return "mongo-sanitize" not in lowered
+
+    field_from_untyped_body = re.search(
+        mongo_call + r"\s*\{[^)]*:\s*(?:req|request)\.(?:body|query|params)\.[a-z0-9_]+",
+        lowered,
+        flags=re.DOTALL,
+    )
+    if field_from_untyped_body:
+        return not any(token in lowered for token in ("string(", "number(", "boolean(", "z.object", "joi.", "mongo-sanitize"))
+    return False
+
+
+def has_rust_sql_injection_signal(lowered: str) -> bool:
+    query_sink = any(token in lowered for token in ("sqlx::query(", "sqlx::query_as(", "diesel::sql_query(", ".execute(&query", ".fetch_all(&query"))
+    dynamic_sql = any(token in lowered for token in ("format!(\"select", "format!(\"update", "format!(\"delete", "format!(\"insert", "format!(\"with"))
+    has_source = any(token in lowered for token in ("query<", "form<", "path<", "json<", "params", "request", "reqwest"))
+    has_parameterization = any(token in lowered for token in (".bind(", "query_as!("))
+    return query_sink and dynamic_sql and has_source and not has_parameterization
 
 
 def has_eval_injection_signal(lowered: str) -> bool:
@@ -962,7 +1118,25 @@ def extract_snippet(content: str, line_number: int, radius: int = 2) -> str:
 def first_suspicious_line(text: str) -> int:
     for index, line in enumerate(text.splitlines(), start=1):
         lowered = line.lower()
-        if any(token in lowered for token in ("subprocess", "requests.", "httpx.", "send_file", "fileresponse", "jwt", "pickle", "yaml.load")):
+        if any(
+            token in lowered
+            for token in (
+                "subprocess",
+                "requests.",
+                "httpx.",
+                "send_file",
+                "fileresponse",
+                "jwt",
+                "pickle",
+                "yaml.load",
+                "find_one",
+                "findone",
+                "update_one",
+                "aggregate",
+                "sqlx::query",
+                "diesel::sql_query",
+            )
+        ):
             return index
     return 1
 

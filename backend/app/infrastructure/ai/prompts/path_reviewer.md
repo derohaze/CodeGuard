@@ -44,6 +44,8 @@ Strict rules:
 - do not report React or Angular XSS unless an unsafe escape hatch such as `dangerouslySetInnerHTML`, raw HTML bypass, or equivalent is evident
 - do not report SSRF when the evidence controls only the request path and not host or protocol
 - do not report issues that appear only in tests or documentation
+- do not report SQL/NoSQL injection from fixed query/operator structure alone; prove attacker control over query structure, operators, or raw query text
+- for Mongo/NoSQL, fixed `$and`, `$or`, `$regex`, `$ne`, `$set`, or Redis key/command usage is not enough; scalar values, escaped strings, and internally typed fields are not operator injection
 - prefer fewer, high-confidence findings over many weak ones
 - each finding must point to a concrete file and line inside the supplied block context
 - if the supplied evidence supports source_hint, sink_hint, or path_hint, include them
