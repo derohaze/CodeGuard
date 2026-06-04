@@ -541,6 +541,101 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             failure_kind="output_format",
         )
 
+    async def _chat_with_tools(
+        self,
+        *,
+        task_name: str,
+        max_tokens: int,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> dict:
+        target = self._target_for_task(task_name)
+        payload: dict[str, object] = {
+            "model": target.model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.02,
+            "top_p": 1,
+            "stream": False,
+        }
+        if tools:
+            payload["tools"] = tools
+
+        url = _chat_completions_url(target.base_url)
+        last_error: ExternalAIServiceError | None = None
+        body: dict | None = None
+
+        total_rounds = max(1, int(self.retry_attempts))
+        for round_index in range(total_rounds):
+            ordered_api_keys = self._ordered_api_keys(target)
+            for api_key in ordered_api_keys:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                }
+                try:
+                    async with httpx.AsyncClient(timeout=target.timeout_seconds) as client:
+                        response = await client.post(url, json=payload, headers=headers)
+                        response.raise_for_status()
+                        body = response.json()
+                        break
+                except httpx.TimeoutException as exc:
+                    last_error = ExternalAIServiceError(
+                        _provider_timeout_message(target.provider_name),
+                        provider=target.provider_name, retryable=True, failure_kind="timeout",
+                    )
+                    if len(ordered_api_keys) > 1: continue
+                    if round_index >= total_rounds - 1: raise last_error from exc
+                except httpx.HTTPStatusError as exc:
+                    last_error = _map_provider_http_error(target.provider_name, exc.response)
+                    if not _should_try_next_key(last_error): raise last_error from exc
+                    if len(ordered_api_keys) > 1: continue
+                    if round_index >= total_rounds - 1: raise last_error from exc
+                except httpx.HTTPError as exc:
+                    last_error = ExternalAIServiceError(
+                        _provider_runtime_message(target.provider_name),
+                        provider=target.provider_name, retryable=True, failure_kind="runtime",
+                    )
+                    if len(ordered_api_keys) > 1: continue
+                    if round_index >= total_rounds - 1: raise last_error from exc
+
+            if body is not None: break
+            if last_error is None: break
+            if round_index >= total_rounds - 1 or not last_error.retryable: raise last_error
+            if self.retry_backoff_seconds > 0:
+                await asyncio.sleep(min(self.retry_backoff_seconds * (2**round_index), 15.0))
+
+        if body is None:
+            raise last_error or ExternalAIServiceError(
+                _provider_runtime_message(target.provider_name),
+                provider=target.provider_name, retryable=True, failure_kind="runtime",
+            )
+
+        choices = body.get("choices", [])
+        if not choices:
+            raise ExternalAIServiceError(
+                "AI provider returned no completion choices.",
+                provider=target.provider_name, retryable=True, failure_kind="output_format",
+            )
+        choice = choices[0]
+        msg = choice.get("message", {})
+        finish_reason = choice.get("finish_reason", "")
+
+        result: dict = {"role": "assistant", "content": msg.get("content", "") or ""}
+        tool_calls = msg.get("tool_calls")
+        if tool_calls:
+            parsed_calls = []
+            for tc in tool_calls:
+                fn = tc.get("function", {})
+                parsed_calls.append({
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {"name": fn.get("name", ""), "arguments": fn.get("arguments", "{}")},
+                })
+            result["tool_calls"] = parsed_calls
+        result["finish_reason"] = finish_reason
+        return result
+
     def _target_for_task(self, task_name: str) -> _ProviderTarget:
         return _ProviderTarget(
             provider_name=self.provider_name,

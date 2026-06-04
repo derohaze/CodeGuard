@@ -12,12 +12,25 @@ export interface GatewayConfig {
   host: string;
   port: number;
   pythonApiBaseUrl: string;
+  corsAllowedOrigins: string[];
+  maxBodyBytes: number;
+  requestTimeoutMs: number;
+  upstreamConnectTimeoutMs: number;
 }
+
+const DEFAULT_CORS_ORIGINS = "http://localhost:8080,http://127.0.0.1:8080,http://[::1]:8080,null";
 
 export const config: GatewayConfig = {
   host: env("NODE_GATEWAY_HOST", "127.0.0.1"),
   port: intEnv("NODE_GATEWAY_PORT", 7000, 1, 65535),
   pythonApiBaseUrl: trimTrailingSlash(env("PYTHON_API_BASE_URL", `http://127.0.0.1:${env("APP_PORT", "8000")}`)),
+  corsAllowedOrigins: listEnv(
+    "NODE_GATEWAY_CORS_ORIGINS",
+    mergeListValues(env("APP_CORS_ORIGINS", ""), DEFAULT_CORS_ORIGINS),
+  ),
+  maxBodyBytes: intEnv("NODE_GATEWAY_MAX_BODY_MB", 25, 1, 1024) * 1024 * 1024,
+  requestTimeoutMs: intEnv("NODE_GATEWAY_REQUEST_TIMEOUT_SECONDS", 120, 5, 600) * 1000,
+  upstreamConnectTimeoutMs: intEnv("NODE_GATEWAY_UPSTREAM_CONNECT_TIMEOUT_SECONDS", 10, 1, 120) * 1000,
 };
 
 function loadBackendEnv(envFile: string): void {
@@ -59,6 +72,22 @@ function intEnv(key: string, fallback: number, min: number, max: number): number
     throw new Error(`${key} must be an integer between ${min} and ${max}.`);
   }
   return parsed;
+}
+
+function listEnv(key: string, fallback: string): string[] {
+  const raw = env(key, fallback);
+  return splitList(raw);
+}
+
+function mergeListValues(...values: string[]): string {
+  return [...new Set(values.flatMap(splitList))].join(",");
+}
+
+function splitList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 function trimTrailingSlash(value: string): string {

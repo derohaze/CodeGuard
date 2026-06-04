@@ -32,6 +32,7 @@ import { RepoOverviewScreen } from "@/features/repo-overview";
 import { ServiceExposureScreen } from "@/features/service-exposure";
 import { TeamSecurityPostureScreen } from "@/features/team-security-posture";
 import { VerificationScreen } from "@/features/verification";
+import { buildApprovalQueue } from "@/entities/finding/lib/approval-queue";
 import type { Finding, PatchExportSnapshot, RemediationPlan } from "@/entities/finding/model/types";
 import type { Session } from "@/entities/session/model/types";
 import { mergeSessionOrder } from "@/entities/session/lib/session-order";
@@ -133,6 +134,13 @@ export default function Page() {
     patchSettings: patchRuntimeSettings,
   } = useRuntimeSettings();
   const sessionWorkspaceTabs = buildSessionWorkspaceTabs(activeSession, screen);
+  const hasElectronTitlebar = typeof window !== "undefined" && typeof window.electronAPI?.versions?.electron === "string";
+
+  useEffect(() => {
+    if (sessionWorkspaceTabs.length === 0) return;
+    if (sessionWorkspaceTabs.some((tab) => tab.screen === screen)) return;
+    setScreen("scan-completed");
+  }, [screen, sessionWorkspaceTabs]);
 
   const mergeSessionSummary = useCallback((session: Session) => {
     setSessions((current) => {
@@ -1175,7 +1183,7 @@ export default function Page() {
             onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
             onOpenSettings={() => setView("settings")}
           />
-          <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden pt-8">
+          <div className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${hasElectronTitlebar ? "pt-8" : ""}`}>
             {isSidebarCollapsed && (
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
@@ -1295,16 +1303,61 @@ function buildSessionWorkspaceTabs(session: ScanSessionDetail | null, currentScr
     return [];
   }
 
-  return [
-    { screen: "scan-completed", label: "Results" },
-    { screen: "approval-queue", label: "Approval" },
-    { screen: "operations-console", label: "Operations" },
-    { screen: "audit-trail", label: "Audit" },
-    { screen: "governance-center", label: "Governance" },
-    { screen: "analytics-dashboard", label: "Analytics" },
-    { screen: "repo-overview", label: "Repo" },
-    { screen: "service-exposure", label: "Exposure" },
-  ];
+  const tabs: Array<{ screen: AppScreen; label: string }> = [{ screen: "scan-completed", label: "Results" }];
+
+  if (buildApprovalQueue(session.findings).length > 0) {
+    tabs.push({ screen: "approval-queue", label: "Approval" });
+  }
+  if (hasActiveWorkflowSignal(session)) {
+    tabs.push({ screen: "operations-console", label: "Operations" });
+  }
+  if (hasAuditSignal(session)) {
+    tabs.push({ screen: "audit-trail", label: "Audit" });
+  }
+  if (hasGovernanceSignal(session)) {
+    tabs.push({ screen: "governance-center", label: "Governance" });
+  }
+  if (session.findings.length > 0) {
+    tabs.push({ screen: "analytics-dashboard", label: "Analytics" });
+  }
+  if (hasRepositorySignal(session)) {
+    tabs.push({ screen: "repo-overview", label: "Repo" });
+  }
+  if (hasExposureSignal(session)) {
+    tabs.push({ screen: "service-exposure", label: "Exposure" });
+  }
+
+  return tabs;
+}
+
+function hasActiveWorkflowSignal(session: ScanSessionDetail): boolean {
+  const workflow = session.session.workflowSummary;
+  if (!workflow) return false;
+  if (workflow.state !== "completed" || workflow.blockingItems > 0) return true;
+  if (workflow.operationsSummary?.pendingHandoff || (workflow.operationsSummary?.activeItemCount ?? 0) > 0) return true;
+  if (workflow.recoverySummary?.retryAvailable || workflow.recoverySummary?.controllerStatus !== "closed") return true;
+  return false;
+}
+
+function hasAuditSignal(session: ScanSessionDetail): boolean {
+  return session.findings.length > 0 || session.candidateFindings.length > 0 || session.session.annotations.length > 0;
+}
+
+function hasGovernanceSignal(session: ScanSessionDetail): boolean {
+  return session.findings.some((finding) =>
+    finding.approvalStatus !== "not_required"
+    || finding.decisionSummary?.policyOutcome !== "auto-eligible"
+    || finding.decisionSummary?.escalationState !== "none",
+  );
+}
+
+function hasRepositorySignal(session: ScanSessionDetail): boolean {
+  if (session.session.targetType !== "folder") return false;
+  return Boolean(session.session.repositoryInventory || session.session.repositoryGraph || session.session.segmentationSummary || session.session.securityRegistry);
+}
+
+function hasExposureSignal(session: ScanSessionDetail): boolean {
+  return session.session.totalPathsCount > 0 || Number(session.session.pathSummary?.candidate_path_count ?? 0) > 0;
 }
 
 function SessionWorkspaceTabs({
@@ -1412,48 +1465,44 @@ function SessionWorkspaceTabs({
   };
 
   return (
-    <div className="px-6 pb-2">
-      <div
-        className="rounded-[28px] border bg-card px-6 py-5 shadow-[0_12px_30px_rgba(52,42,28,0.05)]"
-        style={{ borderColor: "hsl(var(--border-soft))" }}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[15px] font-semibold text-txt-primary">{session.session.repo}</p>
-            <p className="mt-1.5 text-xs uppercase tracking-[0.18em] text-txt-tertiary">
-              {session.session.scanMode === "deep" ? "Deep analysis" : "Fast analysis"} | {session.session.time}
-            </p>
+    <div className="border-b bg-surface px-6 pt-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-3">
+            <h2 className="truncate text-[15px] font-semibold text-txt-primary">{session.session.repo}</h2>
+            <span className="rounded-full bg-secondary px-2.5 py-1 text-[12px] font-medium text-txt-secondary">
+              {session.verdict === "safe" ? "Reviewed" : "Completed"}
+            </span>
           </div>
-          <p className="pt-0.5 text-sm font-semibold text-txt-primary">
-            {session.verdict === "safe" ? "Reviewed" : "Completed"}
+          <p className="mt-1 text-[12px] text-txt-tertiary">
+            {session.session.scanMode === "deep" ? "Deep analysis" : "Fast analysis"} · {session.session.time}
           </p>
         </div>
-        <div
-          ref={scrollRef}
-          onMouseDown={handleMouseDown}
-          onWheel={handleWheel}
-          className="hide-scrollbar mt-5 overflow-x-auto pb-1 select-none"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none", cursor: isDraggingTabs ? "grabbing" : "grab" }}
-        >
-          <div className="flex min-w-max gap-2.5 pl-0.5 pr-2">
-            {tabs.map((tab) => {
-              const active = currentScreen === tab.screen;
-              return (
-                <button
-                  key={tab.screen}
-                  onClick={(event) => handleTabClick(event, tab.screen)}
-                  className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] transition-all ${
-                    active
-                      ? "bg-[#1e1b16] text-white shadow-[0_10px_22px_rgba(30,27,22,0.22)]"
-                      : "bg-[#f8f2e8] text-[#8b7558] hover:bg-[#f1e7d8] hover:text-txt-primary"
-                  }`}
-                  style={{ borderColor: active ? "#1e1b16" : "hsl(var(--border-soft))" }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+      </div>
+      <div
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onWheel={handleWheel}
+        className="hide-scrollbar mt-4 overflow-x-auto select-none"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", cursor: isDraggingTabs ? "grabbing" : "grab" }}
+      >
+        <div className="flex min-w-max gap-6">
+          {tabs.map((tab) => {
+            const active = currentScreen === tab.screen;
+            return (
+              <button
+                key={tab.screen}
+                onClick={(event) => handleTabClick(event, tab.screen)}
+                className={`shrink-0 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
+                  active
+                    ? "border-txt-primary text-txt-primary"
+                    : "border-transparent text-txt-tertiary hover:text-txt-primary"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

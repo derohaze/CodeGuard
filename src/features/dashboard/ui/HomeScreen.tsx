@@ -56,7 +56,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
   };
 
   return (
-    <div className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-5 pb-4 pt-8 sm:px-6 lg:px-8">
+    <div className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-5 pb-4 pt-4 sm:px-6 lg:px-8">
       <div className="flex min-h-full w-full flex-1 flex-col gap-5">
         <div className="max-w-[760px]">
           <div className="flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">

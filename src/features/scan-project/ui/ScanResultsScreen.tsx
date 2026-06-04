@@ -31,6 +31,13 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
   const surfacedValidatedFindings = orderedValidatedFindings.filter((finding) => !approvalQueuedFindingIds.has(finding.id));
   const activeFindingCounts = countSeverities(surfacedValidatedFindings);
   const activeValidatedCount = surfacedValidatedFindings.length;
+  const scoreExplanation = buildScoreExplanation(session, {
+    activeValidatedCount,
+    approvalQueueCount: approvalQueue.length,
+    candidateCount: filteredCandidateFindings.length,
+  });
+  const showWorkflowDetails = hasMeaningfulWorkflowDetails(session);
+  const showTechnicalSignals = hasMeaningfulTechnicalSignals(session);
   const hasAnalysisBrief = Boolean(
     analysisBrief?.scoreExplanation
       || analysisBrief?.potentialRisks.length
@@ -108,11 +115,18 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-              <ScoreIssueChip label="Open critical" value={activeFindingCounts.critical} tone="critical" />
-              <ScoreIssueChip label="Open findings" value={activeValidatedCount} tone="high" />
-              <ScoreIssueChip label="Review queue" value={approvalQueue.length} tone="medium" />
-              <ScoreIssueChip label="Candidates" value={filteredCandidateFindings.length} tone="low" />
+            <div className="rounded-lg border bg-card px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+              <p className="text-sm font-semibold text-txt-primary">What this score means</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-txt-secondary">
+                {scoreExplanation.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <ScoreIssueChip label="Confirmed issues" value={activeValidatedCount} tone="high" />
+                <ScoreIssueChip label="Review queue" value={approvalQueue.length} tone="medium" />
+                <ScoreIssueChip label="Candidates" value={filteredCandidateFindings.length} tone="low" />
+              </div>
             </div>
           </div>
         </motion.div>
@@ -153,7 +167,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
           )}
         </motion.div>
 
-        {session.session.workflowSummary && (
+        {showWorkflowDetails && session.session.workflowSummary && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -288,6 +302,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
           </motion.div>
         )}
 
+        {showTechnicalSignals && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -310,7 +325,9 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
             note={`${Number(session.session.pathSummary?.cross_file_paths ?? 0)} cross-file paths identified`}
           />
         </motion.div>
+        )}
 
+        {showTechnicalSignals && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -341,6 +358,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
             }
           />
         </motion.div>
+        )}
 
         {hasAnalysisBrief && analysisBrief && (
           <motion.div
@@ -416,6 +434,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
           />
         )}
 
+        {approvalQueue.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -456,14 +475,11 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
                 </button>
               );
             })}
-            {approvalQueue.length === 0 && (
-              <p className="text-sm leading-6 text-txt-secondary">
-                No finding is currently waiting in the approval queue for this saved analysis session.
-              </p>
-            )}
           </div>
         </motion.div>
+        )}
 
+        {session.session.annotations.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -479,14 +495,65 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
             {session.session.annotations.slice(0, 6).map((annotation) => (
               <AnnotationRow key={`${annotation.file}:${annotation.lineStart}:${annotation.title}`} annotation={annotation} />
             ))}
-            {session.session.annotations.length === 0 && (
-              <p className="text-sm leading-6 text-txt-secondary">No line-level annotations were produced for this analysis.</p>
-            )}
           </div>
         </motion.div>
+        )}
       </div>
     </motion.div>
   );
+}
+
+function buildScoreExplanation(
+  session: ScanSessionDetail,
+  counts: { activeValidatedCount: number; approvalQueueCount: number; candidateCount: number },
+): string[] {
+  const score = session.session.securityScore;
+  const coveragePercent = Number(session.session.scoreRationale?.coverage_percent ?? session.session.coveragePercent);
+  const candidatePressure = Number(session.session.scoreRationale?.candidate_pressure ?? counts.candidateCount);
+  const explanations: string[] = [];
+
+  if (typeof score === "number") {
+    explanations.push(`${score}/100 is the confidence score for this saved run, not a finding count.`);
+  } else {
+    explanations.push("No score was produced for this run.");
+  }
+
+  if (counts.activeValidatedCount === 0) {
+    explanations.push("No confirmed high-confidence vulnerability is currently open in this scope.");
+  } else {
+    explanations.push(`${counts.activeValidatedCount} confirmed finding(s) still need review or remediation.`);
+  }
+
+  if (coveragePercent < 100) {
+    explanations.push(`The score is capped by partial coverage: ${coveragePercent}% of the selected scope was reviewed.`);
+  } else if (typeof score === "number" && score < 100 && counts.activeValidatedCount === 0) {
+    explanations.push("The remaining gap is residual uncertainty from conservative analysis, not a confirmed bug.");
+  }
+
+  if (counts.approvalQueueCount > 0 || candidatePressure > 0) {
+    explanations.push(`${counts.approvalQueueCount} approval item(s) and ${candidatePressure} candidate signal(s) still affect confidence.`);
+  } else {
+    explanations.push("There is no queued approval item or candidate signal blocking this result.");
+  }
+
+  return explanations;
+}
+
+function hasMeaningfulWorkflowDetails(session: ScanSessionDetail): boolean {
+  const workflow = session.session.workflowSummary;
+  if (!workflow) return false;
+  if (workflow.state !== "completed" || workflow.blockingItems > 0) return true;
+  if (workflow.operationsSummary?.pendingHandoff || (workflow.operationsSummary?.activeItemCount ?? 0) > 0) return true;
+  if (workflow.recoverySummary?.retryAvailable || workflow.recoverySummary?.controllerStatus !== "closed") return true;
+  if (workflow.workflowClosure?.requiresHumanControl) return true;
+  return false;
+}
+
+function hasMeaningfulTechnicalSignals(session: ScanSessionDetail): boolean {
+  if (session.findings.length > 0 || session.candidateFindings.length > 0) return true;
+  if (session.session.targetType === "folder") return true;
+  if (session.session.totalPathsCount > 0 || Number(session.session.pathSummary?.candidate_path_count ?? 0) > 0) return true;
+  return false;
 }
 
 function buildFindingFingerprint(finding: Finding): string {

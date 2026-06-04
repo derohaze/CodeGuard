@@ -48,10 +48,12 @@ const ingestionRpsOptions = [2, 5, 10, 15, 20, 30];
 const ingestionRetryOptions = [1, 2, 3, 4, 5, 6];
 
 export function SettingsScreen({ onBack, settings, onPatchSettings, isSaving }: SettingsScreenProps) {
+  const hasElectronTitlebar = typeof window !== "undefined" && typeof window.electronAPI?.versions?.electron === "string";
+
   return (
     <div key="settings-screen" className="flex min-h-0 flex-1 bg-surface">
       <aside className="flex w-[272px] shrink-0 flex-col border-r bg-[#f7f2eb]" style={{ borderColor: "hsl(var(--border-soft))" }}>
-        <div className="app-drag h-8 border-b" style={{ borderColor: "hsl(var(--border-soft))" }} />
+        {hasElectronTitlebar ? <div className="app-drag h-8 border-b" style={{ borderColor: "hsl(var(--border-soft))" }} /> : null}
         <div className="flex h-12 items-center border-b px-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
           <button
             onClick={onBack}

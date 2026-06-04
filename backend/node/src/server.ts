@@ -5,7 +5,13 @@ import { proxyToPython } from "./proxy.js";
 
 const server = http.createServer((request, response) => {
   const startedAt = performance.now();
-  setCorsHeaders(response);
+  const corsAllowed = setCorsHeaders(request, response);
+
+  if (!corsAllowed) {
+    response.on("finish", () => logAccess(request, response, startedAt, "gateway"));
+    sendJson(response, 403, { detail: "CORS origin is not allowed." });
+    return;
+  }
 
   if (request.method === "OPTIONS") {
     response.on("finish", () => logAccess(request, response, startedAt, "gateway"));
@@ -21,7 +27,6 @@ const server = http.createServer((request, response) => {
     sendJson(response, 200, {
       status: "ok",
       service: "node-security-gateway",
-      python_api_base_url: config.pythonApiBaseUrl,
       owned_surfaces: ["security-api-proxy"],
     });
     return;
@@ -37,15 +42,26 @@ const server = http.createServer((request, response) => {
   sendJson(response, 404, { detail: "Route not found." });
 });
 
+server.requestTimeout = config.requestTimeoutMs;
+server.headersTimeout = Math.min(60_000, config.requestTimeoutMs);
+
 server.listen(config.port, config.host, () => {
   logStartup(`listening on http://${config.host}:${config.port}`);
   logStartup(`proxying security API to ${config.pythonApiBaseUrl}`);
 });
 
-function setCorsHeaders(response: ServerResponse): void {
-  response.setHeader("Access-Control-Allow-Origin", "*");
+function setCorsHeaders(request: IncomingMessage, response: ServerResponse): boolean {
+  const origin = request.headers.origin;
+  if (origin !== undefined) {
+    if (!config.corsAllowedOrigins.includes(origin)) {
+      return false;
+    }
+    response.setHeader("Access-Control-Allow-Origin", origin);
+    response.setHeader("Vary", "Origin");
+  }
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  return true;
 }
 
 function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {
