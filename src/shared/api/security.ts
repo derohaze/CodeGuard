@@ -2,7 +2,7 @@ import type { Finding, FindingDecisionSummary, RemediationActionResult, Remediat
 import type { Session, SessionAnalysisBrief } from "@/entities/session/model/types";
 import { fetchWithStartupRetry } from "@/shared/api/network";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:7000/api/v1";
 
 export interface StartScanPayload {
   sourcePath: string;
