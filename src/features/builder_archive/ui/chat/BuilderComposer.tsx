@@ -77,7 +77,7 @@ export function BuilderComposer({
       ? "#b55349"
       : contextUsage.percentage >= 70
         ? "#c08b22"
-        : "#3f8f63";
+        : "#525252";
 
   useEffect(() => {
     const element = inputRef.current;
@@ -148,7 +148,7 @@ export function BuilderComposer({
     <>
       <div className="bg-surface px-8 py-3">
         <div className="mx-auto flex w-full max-w-[980px] flex-col gap-1.5">
-          <div className="w-full rounded-[28px] border bg-card px-4 py-2.5 shadow-[0_14px_28px_rgba(52,42,28,0.05)]" style={{ borderColor: "hsl(var(--border-soft))" }}>
+          <div className="w-full rounded-[28px] border bg-card px-4 py-2.5 shadow-[0_14px_28px_rgba(0,0,0,0.05)]" style={{ borderColor: "hsl(var(--border-soft))" }}>
             {composerSettings.attachedFiles.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {composerSettings.attachedFiles.map((filePath) => (
@@ -185,7 +185,7 @@ export function BuilderComposer({
                       <Plus size={16} />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent side="top" align="start" sideOffset={12} className="w-[220px] rounded-[18px] border border-border-soft bg-card p-1.5 text-txt-primary shadow-[0_16px_30px_rgba(52,42,28,0.12)]">
+                  <PopoverContent side="top" align="start" sideOffset={12} className="w-[220px] rounded-[18px] border border-border-soft bg-card p-1.5 text-txt-primary shadow-[0_16px_30px_rgba(0,0,0,0.12)]">
                     <button type="button" onClick={onPickAttachment} className="flex w-full items-center gap-2.5 rounded-[14px] border border-border-soft bg-surface px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-muted">
                       <FilePlus2 size={14} className="text-txt-secondary" />
                       <span>Add photos &amp; files</span>
@@ -204,7 +204,7 @@ export function BuilderComposer({
                   </PopoverContent>
                 </Popover>
                 {composerSettings.planMode && (
-                  <div className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#edf4ff] px-2.5 text-[13px] font-medium text-[#3f6fb2]">
+                  <div className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#f4f4f5] px-2.5 text-[13px] font-medium text-[#525252]">
                     <ListTodo size={13} />
                     <span>Plan</span>
                   </div>
@@ -266,7 +266,7 @@ export function BuilderComposer({
                     Change permissions
                   </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent side="top" align="start" sideOffset={10} className="w-[200px] rounded-[16px] border border-border-soft bg-card p-1.5 text-txt-primary shadow-[0_16px_30px_rgba(52,42,28,0.12)]">
+                <DropdownMenuContent side="top" align="start" sideOffset={10} className="w-[200px] rounded-[16px] border border-border-soft bg-card p-1.5 text-txt-primary shadow-[0_16px_30px_rgba(0,0,0,0.12)]">
                   <DropdownMenuRadioGroup
                     value={composerSettings.permissionMode}
                     onValueChange={(value) => requestPermissionModeChange(value as "default" | "full-access")}
@@ -315,7 +315,7 @@ export function BuilderComposer({
       </div>
 
       <AlertDialog open={isPermissionDialogOpen} onOpenChange={setIsPermissionDialogOpen}>
-        <AlertDialogContent className="max-w-[660px] rounded-[28px] border border-border-soft bg-card p-0 text-txt-primary shadow-[0_24px_64px_rgba(52,42,28,0.12)] [&>button]:hidden [&>div[data-radix-alert-dialog-overlay]]:bg-transparent">
+        <AlertDialogContent className="max-w-[660px] rounded-[28px] border border-border-soft bg-card p-0 text-txt-primary shadow-[0_24px_64px_rgba(0,0,0,0.12)] [&>button]:hidden [&>div[data-radix-alert-dialog-overlay]]:bg-transparent">
           <div className="px-9 py-8">
             <AlertDialogHeader className="space-y-4 text-left">
               <AlertDialogTitle className="text-[18px] font-semibold tracking-[-0.02em] text-txt-primary">
@@ -329,7 +329,7 @@ export function BuilderComposer({
               <AlertDialogCancel onClick={handleCancelPermissionModeChange} className="mt-0 rounded-2xl border border-border-soft bg-surface px-6 py-2.5 text-[15px] font-medium text-txt-primary hover:bg-muted">
                 Cancel
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmPermissionModeChange} className="rounded-2xl border-0 bg-[#6a4036] px-6 py-2.5 text-[15px] font-medium text-[#fff4f0] hover:bg-[#7a4b3f]">
+              <AlertDialogAction onClick={handleConfirmPermissionModeChange} className="rounded-2xl border-0 bg-[#171717] px-6 py-2.5 text-[15px] font-medium text-[#ffffff] hover:bg-[#262626]">
                 {permissionDialogCopy.confirm}
               </AlertDialogAction>
             </AlertDialogFooter>

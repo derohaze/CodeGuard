@@ -53,7 +53,7 @@ export function VerificationScreen({
               </p>
             </div>
             <div className={`rounded-md px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${
-              isVerified ? "bg-[#eef8ef] text-status-success" : "bg-[#fff7f5] text-status-high"
+              isVerified ? "bg-[#f4f4f5] text-status-success" : "bg-[#fff7f5] text-status-high"
             }`}>
               {isVerified ? "Verified" : requiresManualReview ? "Manual review required" : "Verification pending"}
             </div>
@@ -189,7 +189,7 @@ function VerificationCard({
   return (
     <div
       className={`rounded-lg border px-4 py-4 ${
-        tone === "success" ? "bg-[#eef8ef]" : tone === "warning" ? "bg-[#fff7f5]" : "bg-card"
+        tone === "success" ? "bg-[#f4f4f5]" : tone === "warning" ? "bg-[#fff7f5]" : "bg-card"
       }`}
       style={{ borderColor: "hsl(var(--border-soft))" }}
     >

@@ -46,7 +46,7 @@ export function DataFlowGraph({ steps }: { steps?: string[] }) {
           return (
             <div key={node.id} className="relative min-w-0">
               <div
-                className={`rounded-[16px] border px-3 py-3 ${node.tone === "danger" ? "bg-[#fff7f5]" : "bg-[#fbf7f1]"}`}
+                className={`rounded-[16px] border px-3 py-3 ${node.tone === "danger" ? "bg-[#fff7f5]" : "bg-[#f7f7f7]"}`}
                 style={{
                   borderColor: node.tone === "danger" ? "rgba(214, 131, 114, 0.24)" : "hsl(var(--border-soft))",
                 }}

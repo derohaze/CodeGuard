@@ -21,7 +21,7 @@ export function BuilderNewChat({
               key={suggestion.id}
               type="button"
               onClick={() => onSelectSuggestion(suggestion.title)}
-              className="rounded-[24px] border bg-[#f5efe3] px-5 py-5 text-left shadow-[0_10px_24px_rgba(52,42,28,0.05)] transition-colors hover:bg-[#efe6d4]"
+              className="rounded-[24px] border bg-[#f4f4f5] px-5 py-5 text-left shadow-[0_10px_24px_rgba(0,0,0,0.05)] transition-colors hover:bg-[#e5e5e5]"
               style={{ borderColor: "hsl(var(--border-soft))" }}
             >
               <p className="text-[18px] font-medium leading-7 text-txt-primary">{suggestion.title}</p>

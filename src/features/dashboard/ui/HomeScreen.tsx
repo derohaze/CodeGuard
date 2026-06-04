@@ -1,5 +1,6 @@
 import { Clock3, FileCode2, FolderGit2, Play, ScanSearch, ShieldCheck, Trash2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { basename } from "@/features/dashboard/model/home-screen.utils";
 import { useHomeScreen } from "@/features/dashboard/model/useHomeScreen";
 import type { StartScanPayload } from "@/shared/api/security";
@@ -16,6 +17,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
     canBrowse,
     clearRecentSources,
     inferredWorkspace,
+    interactive,
     loading,
     pickPath,
     pickingPath,
@@ -27,6 +29,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
     scanSummary,
     selectedPreset,
     selectedTargetName,
+    setInteractive,
     setLoading,
     setPreset,
     setScanMode,
@@ -47,6 +50,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
       targetType,
       preset,
       scanMode,
+      interactive,
     };
     setTimeout(() => {
       void Promise.resolve(onStartScan(payload)).finally(() => {
@@ -56,7 +60,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
   };
 
   return (
-    <div className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto dotted-bg px-5 pb-4 pt-4 sm:px-6 lg:px-8">
+    <div className="hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface px-5 pb-4 pt-4 sm:px-6 lg:px-8">
       <div className="flex min-h-full w-full flex-1 flex-col gap-5">
         <div className="max-w-[760px]">
           <div className="flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">
@@ -74,7 +78,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
         </div>
 
         <div
-          className="flex flex-1 flex-col rounded-[28px] border bg-card p-5 shadow-[0_12px_28px_rgba(52,42,28,0.03)]"
+          className="flex flex-1 flex-col rounded-2xl border bg-card p-5 shadow-[0_10px_24px_rgba(0,0,0,0.035)]"
           style={{ borderColor: "hsl(var(--border-soft))" }}
         >
           <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] items-start">
@@ -85,7 +89,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                   description="This is inferred automatically from the source path you choose."
                 >
                   <div
-                    className="flex min-h-11 min-w-0 items-center rounded-[14px] border bg-[#f7f2ea] px-4 text-sm font-medium text-txt-primary"
+                    className="flex min-h-11 min-w-0 items-center rounded-lg border bg-surface-secondary px-4 text-sm font-medium text-txt-primary"
                     style={{ borderColor: "hsl(var(--border-soft))" }}
                   >
                     <span className="truncate whitespace-nowrap">{inferredWorkspace}</span>
@@ -98,17 +102,17 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                 >
                   <Select value={preset} onValueChange={(value) => setPreset(value as typeof preset)}>
                     <SelectTrigger
-                      className="h-11 rounded-[14px] border bg-[#f7f2ea] text-sm font-medium text-txt-primary focus:ring-0 focus:ring-offset-0"
+                      className="h-11 rounded-lg border bg-surface-secondary text-sm font-medium text-txt-primary focus:ring-0 focus:ring-offset-0"
                       style={{ borderColor: "hsl(var(--border-soft))" }}
                     >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border border-border-soft bg-surface text-txt-primary shadow-[0_18px_40px_rgba(52,42,28,0.12)]">
+                    <SelectContent className="rounded-lg border border-border-soft bg-card text-txt-primary shadow-[0_18px_40px_rgba(0,0,0,0.1)]">
                       {scanPresets.map((item) => (
                         <SelectItem
                           key={item.id}
                           value={item.id}
-                          className="rounded-lg text-sm focus:bg-secondary focus:text-txt-primary"
+                          className="rounded-md text-sm focus:bg-secondary focus:text-txt-primary"
                         >
                           {item.label}
                         </SelectItem>
@@ -123,20 +127,43 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                 >
                   <Select value={scanMode} onValueChange={(value) => setScanMode(value as "fast" | "deep")}>
                     <SelectTrigger
-                      className="h-11 rounded-[14px] border bg-[#f7f2ea] text-sm font-medium text-txt-primary focus:ring-0 focus:ring-offset-0"
+                      className="h-11 rounded-lg border bg-surface-secondary text-sm font-medium text-txt-primary focus:ring-0 focus:ring-offset-0"
                       style={{ borderColor: "hsl(var(--border-soft))" }}
                     >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border border-border-soft bg-surface text-txt-primary shadow-[0_18px_40px_rgba(52,42,28,0.12)]">
-                      <SelectItem value="deep" className="rounded-lg text-sm focus:bg-secondary focus:text-txt-primary">
+                    <SelectContent className="rounded-lg border border-border-soft bg-card text-txt-primary shadow-[0_18px_40px_rgba(0,0,0,0.1)]">
+                      <SelectItem value="deep" className="rounded-md text-sm focus:bg-secondary focus:text-txt-primary">
                         Deep analysis
                       </SelectItem>
-                      <SelectItem value="fast" className="rounded-lg text-sm focus:bg-secondary focus:text-txt-primary">
+                      <SelectItem value="fast" className="rounded-md text-sm focus:bg-secondary focus:text-txt-primary">
                         Fast analysis
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </SetupField>
+
+                <SetupField
+                  label="Interactive mode"
+                  description="Enable live tool-driven penetration testing with real-time LLM agent loop."
+                >
+                  <div
+                    className="flex h-11 items-center justify-between gap-3 rounded-lg border bg-surface-secondary px-3"
+                    style={{ borderColor: "hsl(var(--border-soft))" }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setInteractive(!interactive)}
+                      className="min-w-0 flex-1 text-left text-sm font-medium text-txt-primary"
+                    >
+                      <span className="block truncate">{interactive ? "Enabled" : "Disabled"}</span>
+                    </button>
+                    <Switch
+                      checked={interactive}
+                      onCheckedChange={setInteractive}
+                      aria-label="Toggle interactive mode"
+                    />
+                  </div>
                 </SetupField>
               </div>
 
@@ -145,7 +172,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                 description="Choose whether the analysis should run on a folder or a specific file."
               >
                 <div
-                  className="inline-flex rounded-[18px] border bg-[#f3ede4] p-1"
+                  className="inline-flex rounded-xl border bg-surface-secondary p-1"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   {[
@@ -162,9 +189,9 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                           setTargetType(option.id as "folder" | "file");
                           setTargetPath("");
                         }}
-                        className={`inline-flex items-center gap-2 rounded-[14px] border px-4 py-2 text-sm transition-colors ${
+                        className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${
                           active
-                            ? "border-[hsl(var(--border-soft))] bg-white text-txt-primary"
+                            ? "border-[hsl(var(--border-soft))] bg-card text-txt-primary"
                             : "border-transparent bg-transparent text-txt-secondary hover:text-txt-primary"
                         }`}
                       >
@@ -188,7 +215,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                   <button
                     onClick={pickPath}
                     disabled={pickingPath || !canBrowse}
-                    className="inline-flex h-11 items-center gap-2 self-start rounded-[14px] border bg-[#f7f2ea] px-4 text-sm font-medium text-txt-primary transition-colors disabled:opacity-80"
+                    className="inline-flex h-11 items-center gap-2 self-start rounded-lg border bg-surface-secondary px-4 text-sm font-medium text-txt-primary transition-colors hover:bg-muted disabled:opacity-80"
                     style={{ borderColor: "hsl(var(--border-soft))" }}
                   >
                     {pickingPath ? (
@@ -211,7 +238,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                     </p>
                   )}
                   <div
-                    className="min-w-0 h-[78px] overflow-hidden rounded-[18px] border bg-[#fbf7f1] px-4 py-3"
+                    className="min-w-0 h-[78px] overflow-hidden rounded-xl border bg-card px-4 py-3"
                     style={{ borderColor: "hsl(var(--border-soft))" }}
                   >
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">
@@ -225,7 +252,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                     </p>
                   </div>
                   <div
-                    className="min-w-0 h-[88px] overflow-hidden rounded-[18px] border bg-[#fbf7f1] px-4 py-3"
+                    className="min-w-0 h-[88px] overflow-hidden rounded-xl border bg-card px-4 py-3"
                     style={{ borderColor: "hsl(var(--border-soft))" }}
                   >
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">Selected path</p>
@@ -243,7 +270,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
 
             <div className="min-w-0 flex flex-col space-y-4">
               <div
-                className="rounded-[24px] border bg-[#fbf7f1] px-5 py-5 shadow-[0_10px_22px_rgba(52,42,28,0.025)]"
+                className="rounded-2xl border bg-card px-5 py-5 shadow-[0_10px_22px_rgba(0,0,0,0.025)]"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex items-center gap-2 text-txt-primary">
@@ -258,10 +285,14 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                     label="Target type"
                     value={targetType === "folder" ? "Folder analysis" : "Single file analysis"}
                   />
+                  <PlanRow
+                    label="Penetration mode"
+                    value={interactive ? "Interactive (tool loop)" : "Standard (single-shot)"}
+                  />
                   <PlanRow label="Source" value={selectedTargetName} />
                 </div>
                 <div
-                  className="mt-4 h-[156px] overflow-hidden rounded-[18px] border bg-card px-4 py-3"
+                  className="mt-4 h-[156px] overflow-hidden rounded-xl border bg-surface-secondary px-4 py-3"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">
@@ -275,7 +306,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                 <button
                   onClick={handleStart}
                   disabled={loading || !targetPath}
-                  className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[16px] bg-primary px-5 text-sm font-medium text-primary-foreground shadow-[0_6px_16px_rgba(20,20,18,0.1)] transition-colors hover:bg-primary/95 disabled:opacity-90"
+                  className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,0.12)] transition-colors hover:bg-primary/95 disabled:opacity-90"
                 >
                   {loading ? (
                     <>
@@ -292,7 +323,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
               </div>
 
               <div
-                className="flex flex-col rounded-[24px] border bg-card px-5 py-5 shadow-[0_10px_22px_rgba(52,42,28,0.025)]"
+                className="flex flex-col rounded-2xl border bg-card px-5 py-5 shadow-[0_10px_22px_rgba(0,0,0,0.025)]"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                   <div className="text-txt-primary">
@@ -309,7 +340,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                       {recentSources.length > 0 && (
                         <button
                           onClick={() => clearRecentSources(targetType)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-txt-secondary transition-colors hover:bg-[#f6f1ea] hover:text-txt-primary"
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-txt-secondary transition-colors hover:bg-muted hover:text-txt-primary"
                         >
                           <Trash2 size={12} />
                           Clear history
@@ -322,7 +353,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                         recentSources.map((item) => (
                           <div
                             key={`${item.type}:${item.path}`}
-                            className="flex items-start gap-3 rounded-[18px] border bg-[#fbf7f1] px-4 py-3"
+                            className="flex items-start gap-3 rounded-xl border bg-surface-secondary px-4 py-3"
                             style={{ borderColor: "hsl(var(--border-soft))" }}
                           >
                             <button
@@ -341,7 +372,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                               </div>
                               <button
                                 onClick={() => removeRecentSource(item.path, item.type)}
-                                className="rounded-lg p-1 text-txt-tertiary transition-colors hover:bg-card hover:text-txt-primary"
+                                className="rounded-lg p-1 text-txt-tertiary transition-colors hover:bg-muted hover:text-txt-primary"
                                 aria-label={`Remove ${basename(item.path)} from history`}
                               >
                                 <X size={13} />
@@ -351,7 +382,7 @@ export function HomeScreen({ onStartScan, defaultPreset, defaultScanMode }: Home
                         ))
                       ) : (
                         <div
-                          className="flex h-[160px] items-center rounded-[18px] border bg-[#fbf7f1] px-4 py-5 text-[13px] text-txt-tertiary"
+                          className="flex h-[160px] items-center rounded-xl border bg-surface-secondary px-4 py-5 text-[13px] text-txt-tertiary"
                           style={{ borderColor: "hsl(var(--border-soft))" }}
                         >
                           No recent {targetType === "folder" ? "folders" : "files"} yet.

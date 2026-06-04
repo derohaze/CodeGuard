@@ -65,7 +65,7 @@ export function AuditTrailScreen({ session, onSelectFinding }: Props) {
                 This surface consolidates workflow closure, approval history, policy outcomes, and remediation status into a single trail for the current security run.
               </p>
             </div>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {auditRows.length} trail item{auditRows.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -137,14 +137,14 @@ export function AuditTrailScreen({ session, onSelectFinding }: Props) {
           </div>
           <div className="space-y-3">
             {runAuditLog.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+              <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
                 No run audit log has been recorded for this session.
               </div>
             ) : (
               runAuditLog.map((event) => (
                 <div
                   key={event.id}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -175,7 +175,7 @@ export function AuditTrailScreen({ session, onSelectFinding }: Props) {
           </div>
           <div className="space-y-3">
             {auditRows.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+              <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
                 No findings are available in this session trail yet.
               </div>
             ) : null}
@@ -183,7 +183,7 @@ export function AuditTrailScreen({ session, onSelectFinding }: Props) {
               <button
                 key={finding.id}
                 onClick={() => onSelectFinding(finding)}
-                className="w-full rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-left transition-colors hover:bg-card"
+                className="w-full rounded-2xl border bg-[#f7f7f7] px-4 py-4 text-left transition-colors hover:bg-card"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -218,7 +218,7 @@ export function AuditTrailScreen({ session, onSelectFinding }: Props) {
                     <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">Recent timeline</p>
                     <div className="mt-3 space-y-2">
                       {timelinePreview.map((event) => (
-                        <div key={event.id} className="rounded-xl bg-[#fbf7f1] px-4 py-3">
+                        <div key={event.id} className="rounded-xl bg-[#f7f7f7] px-4 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <span className="text-sm font-medium text-txt-primary">{event.label}</span>
                             <span className="text-[11px] uppercase tracking-[0.14em] text-txt-tertiary">

@@ -142,7 +142,7 @@ describe("ScanResultsScreen", () => {
     expect(screen.queryByRole("button", { name: /open queue/i })).not.toBeInTheDocument();
     expect(screen.getAllByText("Dynamic query construction may allow injection")).toHaveLength(1);
     expect(screen.getAllByText("User-controlled path may reach filesystem access")).toHaveLength(1);
-    expect(screen.getByText("Open findings")).toBeInTheDocument();
+    expect(screen.getByText("Validated findings")).toBeInTheDocument();
     expect(screen.getAllByText("Review queue").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
@@ -234,10 +234,10 @@ describe("ScanResultsScreen", () => {
       />,
     );
 
-    expect(screen.getByText("Score meaning")).toBeInTheDocument();
+    expect(screen.getByText("AI score explanation")).toBeInTheDocument();
     expect(screen.getByText("Potential risks")).toBeInTheDocument();
     expect(screen.getByText("What Aegix could not verify")).toBeInTheDocument();
-    expect(screen.getByText(/cross-file path evidence and runtime integration visibility were limited/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/cross-file path evidence and runtime integration visibility were limited/i)).toHaveLength(1);
     expect(screen.getByText(/redis-backed cache boundaries were reviewed/i)).toBeInTheDocument();
     expect(screen.getByText(/probe malformed api input against monitor endpoints/i)).toBeInTheDocument();
   });

@@ -215,7 +215,7 @@ export function PatchReadyScreen({ onApprove, onRollback, onReject, onRetry, onV
           </section>
 
           <div
-            className="mb-6 rounded-[22px] border bg-[#fbf7f1] px-5 py-4"
+            className="mb-6 rounded-[22px] border bg-[#f7f7f7] px-5 py-4"
             style={{ borderColor: "hsl(var(--border-soft))" }}
           >
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -432,7 +432,7 @@ export function PatchReadyScreen({ onApprove, onRollback, onReject, onRetry, onV
                     key={suggestion.id}
                     onClick={() => setSelectedVariant(suggestion.id)}
                     className={`rounded-2xl border px-4 py-4 text-left transition-colors duration-200 ${
-                      selectedVariant === suggestion.id ? "bg-[#f8f2e9]" : "bg-[#fbf7f1]"
+                      selectedVariant === suggestion.id ? "bg-[#f8f2e9]" : "bg-[#f7f7f7]"
                     }`}
                     style={{ borderColor: selectedVariant === suggestion.id ? "rgba(196, 161, 118, 0.42)" : "hsl(var(--border-soft))" }}
                   >
@@ -757,7 +757,7 @@ function DecisionStep({ label, active }: { label: string; active?: boolean }) {
 
 function MetaCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <div className="flex items-center gap-2 text-txt-secondary">
         <FileCode2 size={14} />
         <p className="text-[11px] uppercase tracking-[0.16em]">{label}</p>
@@ -769,7 +769,7 @@ function MetaCard({ label, value }: { label: string; value: string }) {
 
 function ScoreCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-txt-primary">{value}</p>
       <div className="mt-2 h-2 rounded-full bg-[rgba(207,196,180,0.42)]">
@@ -784,7 +784,7 @@ function ScoreCard({ label, value }: { label: string; value: number }) {
 
 function DecisionInsightCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className="mt-2 text-sm leading-6 text-txt-secondary">{value}</p>
     </div>

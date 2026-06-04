@@ -59,7 +59,7 @@ export function AnalyticsDashboardScreen({ session, onBack, onOpenRepoOverview }
                 This surface summarizes remediation throughput, approval bottlenecks, policy pressure, and current risk distribution for the active security run.
               </p>
             </div>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {session.findings.length} analyzed finding{session.findings.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -205,7 +205,7 @@ export function AnalyticsDashboardScreen({ session, onBack, onOpenRepoOverview }
             {hotspots.map((item) => (
               <div
                 key={item.finding.id}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -247,7 +247,7 @@ export function AnalyticsDashboardScreen({ session, onBack, onOpenRepoOverview }
             {ledgerItems.map((item) => (
               <div
                 key={`${item.ledgerClass}-${item.label}`}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -311,7 +311,7 @@ function AnalyticsTable({
       <p className="text-sm font-semibold text-txt-primary">{title}</p>
       <div className="mt-3 space-y-2">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between rounded-xl bg-[#fbf7f1] px-4 py-3">
+          <div key={row.label} className="flex items-center justify-between rounded-xl bg-[#f7f7f7] px-4 py-3">
             <span className="text-sm text-txt-secondary">{row.label}</span>
             <span className="text-sm font-semibold text-txt-primary">{row.value}</span>
           </div>
@@ -329,7 +329,7 @@ function AnalyticsRow({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className="mt-2 text-sm leading-6 text-txt-secondary">{value}</p>
     </div>

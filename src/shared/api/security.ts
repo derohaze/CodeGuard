@@ -9,6 +9,7 @@ export interface StartScanPayload {
   targetType: "folder" | "file";
   preset: "safe" | "balanced" | "aggressive";
   scanMode: "fast" | "deep";
+  interactive?: boolean;
 }
 
 export interface RuntimeSettings {
@@ -181,6 +182,7 @@ export async function startScan(payload: StartScanPayload): Promise<ScanSessionD
       target_type: payload.targetType,
       preset: payload.preset,
       scan_mode: payload.scanMode,
+      interactive: payload.interactive ?? true,
     }),
   });
   return mapScanSessionDetail(data);

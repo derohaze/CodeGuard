@@ -63,7 +63,7 @@ export function BuilderCommandMenu({
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            className="fixed left-1/2 top-[19%] z-50 w-[min(540px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-[22px] border border-border-soft bg-[#f7f3eb] p-0 shadow-[0_18px_44px_rgba(52,42,28,0.14)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[16%] data-[state=open]:slide-in-from-top-[18%]"
+            className="fixed left-1/2 top-[19%] z-50 w-[min(540px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-[22px] border border-border-soft bg-[#f7f3eb] p-0 shadow-[0_18px_44px_rgba(0,0,0,0.14)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[16%] data-[state=open]:slide-in-from-top-[18%]"
           >
         <Command className="bg-[#f7f3eb] text-txt-primary">
           <div

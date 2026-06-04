@@ -60,7 +60,7 @@ export function BuilderConversationMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={10}
-        className="w-[300px] rounded-[18px] border border-border-soft bg-card p-1.5 text-txt-primary shadow-[0_18px_36px_rgba(52,42,28,0.14)]"
+        className="w-[300px] rounded-[18px] border border-border-soft bg-card p-1.5 text-txt-primary shadow-[0_18px_36px_rgba(0,0,0,0.14)]"
       >
         <DropdownMenuItem className="rounded-[12px] px-3 py-2.5 text-[13px]" disabled>
           <PinOff size={15} className="mr-2.5 text-txt-secondary" />

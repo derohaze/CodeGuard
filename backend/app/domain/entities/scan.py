@@ -102,6 +102,7 @@ class ScanSessionEntity:
     high_risk_files_count: int = 0
     is_safe: bool = False
     unread: bool = True
+    interactive: bool = True
     security_score: int | None = None
     score_rationale: dict | None = None
     findings: list[FindingEntity] = field(default_factory=list)

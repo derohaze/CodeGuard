@@ -140,7 +140,7 @@ export function DiffViewer({ filePath = "Unknown file", beforeCode = "", afterCo
       </div>
 
       <div className="overflow-hidden rounded-[22px] border bg-card" style={{ borderColor: "hsl(var(--border-soft))" }}>
-        <div className="grid gap-3 border-b bg-[#fbf7f1] px-4 py-3 md:grid-cols-[1.2fr_0.8fr_0.7fr]" style={{ borderColor: "hsl(var(--border-soft))" }}>
+        <div className="grid gap-3 border-b bg-[#f7f7f7] px-4 py-3 md:grid-cols-[1.2fr_0.8fr_0.7fr]" style={{ borderColor: "hsl(var(--border-soft))" }}>
           <MetaCard icon={FileCode2} label="Patched file" value={filePath} />
           <MetaCard icon={GitCommitHorizontal} label="Changed blocks" value={`${changedBlocks} review blocks`} />
           <div className="rounded-2xl border bg-card px-3 py-2.5" style={{ borderColor: "hsl(var(--border-soft))" }}>
@@ -184,7 +184,7 @@ function DiffPane({ title, tone, rows }: { title: string; tone: "removed" | "add
       <div className="border-b px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em]" style={{ borderColor: "hsl(var(--border-soft))" }}>
         <span className={tone === "removed" ? "text-status-critical" : "text-status-success"}>{title}</span>
       </div>
-      <div className="border-b bg-[#fbf7f1] px-4 py-2 text-[11px] font-mono text-txt-tertiary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+      <div className="border-b bg-[#f7f7f7] px-4 py-2 text-[11px] font-mono text-txt-tertiary" style={{ borderColor: "hsl(var(--border-soft))" }}>
         @@ review/block-1 @@
       </div>
       <div className="h-[360px] overflow-auto overscroll-contain font-mono text-[12px] leading-6">
@@ -210,7 +210,7 @@ function UnifiedPane({ rows }: { rows: Array<{ number?: number; kind: "context" 
       <div className="border-b px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-txt-tertiary" style={{ borderColor: "hsl(var(--border-soft))" }}>
         Unified view
       </div>
-      <div className="border-b bg-[#fbf7f1] px-4 py-2 text-[11px] font-mono text-txt-tertiary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+      <div className="border-b bg-[#f7f7f7] px-4 py-2 text-[11px] font-mono text-txt-tertiary" style={{ borderColor: "hsl(var(--border-soft))" }}>
         @@ remediation diff @@
       </div>
       <div className="h-[360px] overflow-auto overscroll-contain font-mono text-[12px] leading-6">

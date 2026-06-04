@@ -54,7 +54,7 @@ from app.infrastructure.services.scan.penetration_sandbox import prepare_penetra
 logger = logging.getLogger("aegix.scan")
 
 
-def create_initial_session(source_path: str, target_type: str, preset: str, scan_mode: str = "deep") -> ScanSessionEntity:
+def create_initial_session(source_path: str, target_type: str, preset: str, scan_mode: str = "deep", interactive: bool = True) -> ScanSessionEntity:
     path = Path(source_path).expanduser().resolve()
     if not path.exists():
         raise InvalidSourcePathError(f"Source path does not exist: {source_path}")
@@ -71,6 +71,7 @@ def create_initial_session(source_path: str, target_type: str, preset: str, scan
         source_fingerprint=build_source_fingerprint(str(path), target_type),
         target_type=target_type,
         preset=preset,
+        interactive=interactive,
         scan_mode="fast" if scan_mode == "fast" else "deep",
         status="queued",
         progress=0,
@@ -696,6 +697,8 @@ class ScanExecutionService:
                     logs.append("Penetration sandbox preparation failed; using metadata-only penetration context.")
 
                 penetration_context = {
+                    "interactive": getattr(session, "interactive", False),
+                    "session_id": session_id,
                     "project_name": session.repo,
                     "source_path": session.source_path,
                     "preset": session.preset,

@@ -24,7 +24,7 @@ export function WorkspaceModeSwitch({ mode = "security", onChange }: WorkspaceMo
       >
         <motion.span
           layoutId="workspace-mode-thumb"
-          className="absolute inset-0 rounded-[14px] bg-white shadow-[0_4px_12px_rgba(52,42,28,0.12)]"
+          className="absolute inset-0 rounded-[14px] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
           transition={{ type: "spring", stiffness: 560, damping: 42, mass: 0.68 }}
         />
         <span className="relative z-10 inline-flex items-center justify-center">

@@ -141,7 +141,7 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.16, ease: "linear" }}
-      className="hide-scrollbar dotted-bg flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-surface px-6 py-12 pb-20"
+      className="hide-scrollbar flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-surface px-6 py-10 pb-16"
     >
       <div className="mx-auto flex w-full max-w-[860px] flex-col items-center">
         <h2 className="text-center text-[30px] font-semibold tracking-[-0.03em] text-txt-primary">
@@ -161,7 +161,7 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
               </Label>
               <ProgressBarValue />
             </ProgressBarHeader>
-            <ProgressBarTrack className="bg-[#ece3d6] [--progress-content-bg:hsl(var(--primary))]" />
+            <ProgressBarTrack className="bg-[#e5e5e5] [--progress-content-bg:hsl(var(--primary))]" />
             <Description className="h-6 overflow-hidden text-ellipsis whitespace-nowrap">
               {animatedCurrentLine}
             </Description>
@@ -178,9 +178,9 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
                 {animatedMetrics.phaseProgress}% of {session.session.currentPhase.toLowerCase()}
               </p>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-md bg-[#ece3d6]">
+            <div className="mt-3 h-2 overflow-hidden rounded-md bg-[#e5e5e5]">
               <motion.div
-                className="h-full rounded-md bg-[#b98a45]"
+                className="h-full rounded-md bg-primary"
                 animate={{ width: `${animatedMetrics.phaseProgress}%` }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
               />
@@ -192,11 +192,11 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
         )}
 
         {session && (
-          <div className="mt-4 grid w-full gap-3 md:auto-rows-[132px] md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid w-full gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             <ProgressInfoCard
               label="Mode and phase"
-              value={`${session.session.scanMode === "deep" ? "Deep analysis" : "Fast analysis"} - ${session.session.currentPhase}`}
-              note={`Elapsed ${formatElapsedSeconds(liveElapsedSeconds)}`}
+              value={session.session.scanMode === "deep" ? "Deep analysis" : "Fast analysis"}
+              note={`${session.session.currentPhase} · ${formatElapsedSeconds(liveElapsedSeconds)}`}
             />
             <ProgressInfoCard
               label="Coverage progress"
@@ -235,9 +235,9 @@ export function ScanProgressScreen({ session }: ScanProgressScreenProps) {
                     className="flex items-start gap-3 text-sm text-txt-secondary"
                   >
                     {index === visibleStageLines.length - 1 ? (
-                      <Loader variant="spin" className="mt-[6px] size-3 shrink-0 text-[#b9ab95]" />
+                      <Loader variant="spin" className="mt-[6px] size-3 shrink-0 text-txt-tertiary" />
                     ) : (
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#b9ab95]" />
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-txt-tertiary" />
                     )}
                     {index === visibleStageLines.length - 1 ? (
                       <ShinyText
@@ -282,10 +282,10 @@ function ProgressInfoCard({
   note: string;
 }) {
   return (
-    <div className="flex h-[132px] flex-col overflow-hidden rounded-lg border bg-card px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
-      <p className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
-      <p className="mt-2 truncate text-sm font-semibold text-txt-primary" title={value}>{value}</p>
-      <p className="mt-1 h-10 overflow-hidden text-xs leading-5 text-txt-secondary" title={note}>{note}</p>
+    <div className="flex min-h-[96px] flex-col overflow-hidden rounded-[20px] border bg-card px-4 py-3.5 shadow-[0_8px_18px_rgba(0,0,0,0.025)]" style={{ borderColor: "hsl(var(--border-soft))" }}>
+      <p className="truncate text-[10px] font-medium uppercase tracking-[0.14em] text-txt-tertiary">{label}</p>
+      <p className="mt-2 truncate text-[13px] font-semibold leading-5 text-txt-primary" title={value}>{value}</p>
+      <p className="mt-1 line-clamp-2 overflow-hidden text-xs leading-5 text-txt-secondary" title={note}>{note}</p>
     </div>
   );
 }
@@ -591,6 +591,7 @@ function buildPathDisplay(session: ScanSessionDetail | null, metrics: AnimatedMe
   const reviewedPaths = Number(metrics.tracedPathsCount ?? 0);
   const preparedPaths = Number(metrics.paths_prepared ?? 0);
   const preparedPathsTotal = Number(metrics.paths_total ?? 0);
+  const totalPaths = Number(metrics.totalPathsCount ?? 0);
   const phase = session.session.currentPhase;
 
   if (session.session.status === "completed" && reviewedPaths <= 0 && candidatePaths <= 0) {
@@ -611,14 +612,26 @@ function buildPathDisplay(session: ScanSessionDetail | null, metrics: AnimatedMe
       note: "Tracing is building candidate source-to-sink paths.",
     };
   }
+  if (phase === "Reviewing paths" && reviewedPaths <= 0 && candidatePaths <= 0 && totalPaths <= 0) {
+    return {
+      value: "Path review pending",
+      note: "Review starts after path inventory is available.",
+    };
+  }
   if (reviewedPaths <= 0 && candidatePaths > 0) {
     return {
       value: `${candidatePaths} candidate paths`,
       note: "Inventory prepared.",
     };
   }
+  if (reviewedPaths <= 0 && totalPaths <= 0) {
+    return {
+      value: "Path review pending",
+      note: "No reviewable path inventory has been reported yet.",
+    };
+  }
   return {
-    value: `${reviewedPaths}/${metrics.totalPathsCount || reviewedPaths} paths`,
+    value: `${reviewedPaths}/${totalPaths || reviewedPaths} paths`,
     note: "",
   };
 }

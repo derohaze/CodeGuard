@@ -161,7 +161,7 @@ export function SidebarSessionsList({
                 Filter sessions
               </TooltipContent>
             </Tooltip>
-            <PopoverContent align="end" sideOffset={10} className="w-[216px] rounded-[16px] border border-border-soft bg-surface p-1.5 shadow-[0_16px_36px_rgba(52,42,28,0.1)]">
+            <PopoverContent align="end" sideOffset={10} className="w-[216px] rounded-[16px] border border-border-soft bg-surface p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.1)]">
               <div className="px-1 py-1">
                 {menuSections.map((section, sectionIndex) => (
                   <div key={section.title}>
@@ -207,7 +207,7 @@ export function SidebarSessionsList({
                 Session actions
               </TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" sideOffset={10} className="rounded-xl border border-border-soft bg-surface p-1 text-txt-primary shadow-[0_16px_36px_rgba(52,42,28,0.1)]">
+            <DropdownMenuContent align="end" sideOffset={10} className="rounded-xl border border-border-soft bg-surface p-1 text-txt-primary shadow-[0_16px_36px_rgba(0,0,0,0.1)]">
               <DropdownMenuItem
                 onClick={onDeleteAllSessions}
                 disabled={sessions.length === 0}

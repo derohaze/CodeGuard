@@ -6,67 +6,67 @@
 
 @layer base {
   :root {
-    --background: 40 33% 94%;
-    --foreground: 43 10% 11%;
+    --background: 0 0% 96%;
+    --foreground: 0 0% 9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 43 10% 11%;
+    --card-foreground: 0 0% 9%;
 
-    --popover: 40 33% 97%;
-    --popover-foreground: 43 10% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
 
     --primary: 0 0% 9%;
-    --primary-foreground: 40 33% 98%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 37 22% 94%;
-    --secondary-foreground: 43 10% 11%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 37 18% 91%;
-    --muted-foreground: 33 8% 46%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 42%;
 
-    --accent: 213 72% 59%;
+    --accent: 0 0% 12%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 357 39% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 36 18% 87%;
-    --input: 36 18% 87%;
-    --ring: 213 72% 59%;
+    --border: 0 0% 86%;
+    --input: 0 0% 86%;
+    --ring: 0 0% 18%;
 
     --radius: 0.75rem;
 
     /* Custom tokens */
-    --workspace: 30 18% 82%;
-    --surface: 40 33% 98%;
-    --surface-sidebar: 34 20% 94%;
-    --surface-secondary: 37 27% 96%;
-    --surface-code: 40 14% 95%;
-    --surface-dot: 33 16% 88%;
+    --workspace: 0 0% 88%;
+    --surface: 0 0% 98%;
+    --surface-sidebar: 0 0% 96%;
+    --surface-secondary: 0 0% 95%;
+    --surface-code: 0 0% 94%;
+    --surface-dot: 0 0% 88%;
 
-    --text-primary: 43 10% 11%;
-    --text-secondary: 33 8% 43%;
-    --text-tertiary: 33 8% 59%;
-    --text-placeholder: 33 8% 69%;
+    --text-primary: 0 0% 9%;
+    --text-secondary: 0 0% 38%;
+    --text-tertiary: 0 0% 58%;
+    --text-placeholder: 0 0% 68%;
 
-    --border-primary: 36 18% 87%;
-    --border-soft: 36 20% 91%;
+    --border-primary: 0 0% 86%;
+    --border-soft: 0 0% 90%;
 
-    --status-success: 112 28% 48%;
-    --status-success-bg: 112 40% 95%;
+    --status-success: 0 0% 22%;
+    --status-success-bg: 0 0% 95%;
     --status-critical: 358 35% 60%;
     --status-critical-bg: 358 50% 96%;
-    --status-high: 37 40% 50%;
-    --status-high-bg: 40 60% 95%;
-    --status-progress: 20 58% 58%;
+    --status-high: 0 0% 34%;
+    --status-high-bg: 0 0% 95%;
+    --status-progress: 0 0% 28%;
     --status-disabled: 30 3% 54%;
   }
 
   :root[data-surface-contrast="standard"] {
-    --surface: 40 33% 96%;
-    --surface-sidebar: 34 20% 92%;
-    --surface-secondary: 37 27% 94%;
-    --surface-dot: 33 16% 84%;
+    --surface: 0 0% 96%;
+    --surface-sidebar: 0 0% 94%;
+    --surface-secondary: 0 0% 93%;
+    --surface-dot: 0 0% 84%;
   }
 
   :root[data-theme-mode="system"] {
@@ -120,7 +120,7 @@
     position: relative;
     background-image:
       radial-gradient(circle, hsl(var(--surface-dot) / 0.95) 1px, transparent 1px),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(246, 239, 229, 0.82));
+      linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(245, 245, 245, 0.86));
     background-size: 20px 20px, 100% 100%;
     animation: grid-drift 18s linear infinite;
   }
@@ -129,9 +129,9 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(circle at 20% 20%, rgba(126, 169, 234, 0.12), transparent 28%),
-      radial-gradient(circle at 80% 25%, rgba(239, 173, 122, 0.16), transparent 24%),
-      radial-gradient(circle at 50% 80%, rgba(160, 196, 126, 0.12), transparent 24%);
+      radial-gradient(circle at 20% 20%, rgba(0, 0, 0, 0.035), transparent 28%),
+      radial-gradient(circle at 80% 25%, rgba(0, 0, 0, 0.03), transparent 24%),
+      radial-gradient(circle at 50% 80%, rgba(0, 0, 0, 0.025), transparent 24%);
     animation: grid-pulse 5s ease-in-out infinite;
     pointer-events: none;
   }

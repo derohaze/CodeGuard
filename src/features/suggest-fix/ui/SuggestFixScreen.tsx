@@ -303,7 +303,7 @@ export function SuggestFixScreen({ onComplete, onInvalidatedFinding, finding, fi
                 </div>
                 <div className="space-y-3">
                   {plan.steps.map((step) => (
-                    <div key={step.id} className="rounded-2xl border bg-[#fbf7f1] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+                    <div key={step.id} className="rounded-2xl border bg-[#f7f7f7] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-txt-primary">{step.title}</p>
@@ -507,7 +507,7 @@ function RenderedLine({
           text={text}
           className={className}
           color={type === "status" ? "#b5905a" : "#746b62"}
-          shineColor="#f4efe7"
+          shineColor="#eeeeee"
           speed={type === "status" ? 3.0 : 2.6}
           spread={90}
           disabled={type === "pending"}

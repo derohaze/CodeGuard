@@ -85,14 +85,14 @@ export function FindingDetailPanel({ finding, sessionId, onDismiss, onOpenDecisi
               <span
                 className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${
                   remediationStatusTone === "success"
-                    ? "bg-[#eef8ef] text-status-success"
+                    ? "bg-[#f4f4f5] text-status-success"
                     : remediationStatusTone === "progress"
                       ? "bg-[#f4efe6] text-status-progress"
                       : remediationStatusTone === "warning"
                         ? "bg-[#fff6ef] text-status-high"
                         : remediationStatusTone === "muted"
-                          ? "bg-[#f4efe7] text-txt-secondary"
-                          : "bg-[#f6f1ea] text-txt-secondary"
+                          ? "bg-[#eeeeee] text-txt-secondary"
+                          : "bg-[#f4f4f5] text-txt-secondary"
                 }`}
               >
                 {getRemediationStatusLabel(finding.remediationStatus)}
@@ -127,7 +127,7 @@ export function FindingDetailPanel({ finding, sessionId, onDismiss, onOpenDecisi
               </div>
               <span className="text-sm font-semibold text-txt-primary">{finding.confidence}%</span>
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ece3d6]">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e5e5e5]">
               <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${finding.confidence}%` }} />
             </div>
           </motion.div>
@@ -135,7 +135,7 @@ export function FindingDetailPanel({ finding, sessionId, onDismiss, onOpenDecisi
           <motion.button
             whileTap={{ scale: 0.985 }}
             onClick={() => setShowAttackSimulation((current) => !current)}
-            className="rounded-[20px] border bg-card px-4 py-4 text-left transition-colors hover:bg-[#fbf7f1]"
+            className="rounded-[20px] border bg-card px-4 py-4 text-left transition-colors hover:bg-[#f7f7f7]"
             style={{ borderColor: "hsl(var(--border-soft))" }}
           >
             <div className="flex items-center gap-2 text-txt-primary">
@@ -422,7 +422,7 @@ function SimulationCard({
     tone === "danger"
       ? "bg-[#fff7f5]"
       : tone === "warning"
-        ? "bg-[#fbf7f1]"
+        ? "bg-[#f7f7f7]"
         : "bg-card";
 
   return (
@@ -445,7 +445,7 @@ function StoryMiniCard({
   tone?: "default" | "warning" | "danger";
 }) {
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${tone === "danger" ? "bg-[#fff7f5]" : "bg-[#fbf7f1]"}`} style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className={`rounded-2xl border px-4 py-3 ${tone === "danger" ? "bg-[#fff7f5]" : "bg-[#f7f7f7]"}`} style={{ borderColor: "hsl(var(--border-soft))" }}>
       <div className="flex items-center gap-2 text-txt-secondary">
         <Icon size={14} className={tone === "danger" ? "text-status-critical" : tone === "warning" ? "text-status-high" : "text-txt-secondary"} />
         <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
@@ -467,9 +467,9 @@ function StoryStep({
   tone?: "default" | "warning" | "danger";
 }) {
   return (
-    <div className={`min-w-0 rounded-2xl border px-4 py-4 ${tone === "danger" ? "bg-[#fff7f5]" : tone === "warning" ? "bg-[#fbf7f1]" : "bg-card"}`} style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className={`min-w-0 rounded-2xl border px-4 py-4 ${tone === "danger" ? "bg-[#fff7f5]" : tone === "warning" ? "bg-[#f7f7f7]" : "bg-card"}`} style={{ borderColor: "hsl(var(--border-soft))" }}>
       <div className="flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f6f1ea] text-[11px] font-semibold text-txt-primary">
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f4f4f5] text-[11px] font-semibold text-txt-primary">
           {step}
         </div>
         <p className="text-sm font-medium text-txt-primary">{title}</p>
@@ -489,7 +489,7 @@ function ExplainRow({
   tone?: "default" | "danger";
 }) {
   return (
-    <div className="grid min-w-0 gap-2 rounded-2xl border bg-[#fbf7f1] px-4 py-3 md:grid-cols-[110px_minmax(0,1fr)]" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="grid min-w-0 gap-2 rounded-2xl border bg-[#f7f7f7] px-4 py-3 md:grid-cols-[110px_minmax(0,1fr)]" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className={`min-w-0 break-words text-[13px] leading-6 [overflow-wrap:anywhere] ${tone === "danger" ? "text-status-critical" : "text-txt-secondary"}`}>{value}</p>
     </div>
@@ -512,7 +512,7 @@ function FixModeCard({
   description: string;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="min-w-0 rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <div className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-card/80">
           <Icon size={15} className="text-txt-secondary" />
@@ -542,7 +542,7 @@ function InfoCard({
   mono?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border bg-[#fbf7f1] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="min-w-0 rounded-2xl border bg-[#f7f7f7] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-txt-tertiary">{label}</p>
       <p className={`mt-1.5 min-w-0 max-w-full overflow-hidden break-words text-[13px] leading-6 text-txt-primary ${mono ? "font-mono [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}`}>
         {value}

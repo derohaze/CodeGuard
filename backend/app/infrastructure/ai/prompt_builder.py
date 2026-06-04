@@ -69,11 +69,12 @@ def _identity_section(profile: str) -> str:
 def _objective_section() -> str:
     return (
         "## Objective\n\n"
-        "1. Identify and confirm security vulnerabilities in the target application\n"
-        "2. For each confirmed finding, provide clear evidence (request/response, output)\n"
-        "3. Rate severity correctly (critical/high/medium/low/info)\n"
-        "4. Suggest remediation steps\n"
-        "5. Produce a structured penetration test report"
+        "1. **Static (folder/file)**: Analyze source code — read files, trace source→sink paths, identify vulnerabilities\n"
+        "2. **Dynamic (running service)**: Probe live endpoints, test auth, fuzz inputs, chain multi-step attacks\n"
+        "3. For each confirmed finding, provide clear evidence (request/response, output, code snippet)\n"
+        "4. Rate severity correctly (critical/high/medium/low/info)\n"
+        "5. Suggest remediation steps\n"
+        "6. Produce a structured penetration test report (load `professional-report` skill)"
     )
 
 
@@ -94,12 +95,13 @@ def _target_section(target_info: dict, project_name: str, scan_mode: str, preset
 def _approach_section() -> str:
     return (
         "## Approach\n\n"
-        "1. **Recon** - Enumerate the attack surface first\n"
-        "2. **Load skills** - Use `load_skill` for relevant vulnerability classes\n"
-        "3. **Probe** - Test endpoints with focused payloads using `http`\n"
-        "4. **Verify** - Confirm findings with reproducible evidence\n"
-        "5. **Report** - Use `confirm_finding` to record each vulnerability\n"
-        "6. **Cover** - Track tested areas with `coverage` to avoid gaps"
+        "1. **Start services** (if targeting running app) — Use `load_skill(\"service-orchestrator\")` then start backend + frontend\n"
+        "2. **Recon** — Enumerate the attack surface: read source (static) or probe endpoints (dynamic)\n"
+        "3. **Load skills** — Use `load_skill` for relevant vulnerability classes (jwt, ssrf, webvuln, etc.)\n"
+        "4. **Probe** — Test endpoints with focused payloads using `http` or `shell` (curl)\n"
+        "5. **Verify** — Confirm findings with reproducible evidence\n"
+        "6. **Report** — Use `confirm_finding` to record each vulnerability, then generate report with `professional-report`\n"
+        "7. **Cover** — Track tested areas with `coverage` to avoid gaps"
     )
 
 
@@ -150,15 +152,16 @@ def _intelligence_section(store: IntelligenceStore, target_info: dict) -> str:
 def _tool_usage_section() -> str:
     return (
         "## Tool Usage\n\n"
-        "- `shell` - Execute commands (for local analysis, script execution)\n"
+        "- `shell` - Execute commands (start services, run curl, local analysis)\n"
         "- `http` - Send HTTP requests to test endpoints\n"
         "- `web_fetch` - Fetch web pages to analyze content\n"
         "- `web_search` - Research CVEs, techniques, payloads\n"
-        "- `file_read` - Read files from the project\n"
-        "- `file_write` - Write output files\n"
+        "- `file_read` - Read files from the project (source code, configs)\n"
+        "- `file_write` - Write output files (reports, evidence)\n"
+        "- `file_edit` - Edit source files (for fix verification)\n"
         "- `glob` - Find files by pattern\n"
         "- `grep` - Search file contents\n"
-        "- `load_skill` - Load a methodology playbook\n"
+        "- `load_skill` - Load a methodology playbook (service-orchestrator, dynamic-pentest, etc.)\n"
         "- `coverage` - Track what you have tested\n"
         "- `confirm_finding` - Record a confirmed vulnerability\n"
         "- `ask_user` - Ask me questions when you need input"
@@ -168,14 +171,16 @@ def _tool_usage_section() -> str:
 def _report_format_section() -> str:
     return (
         "## Report Format\n\n"
-        "When you have completed testing, produce a penetration test report with:\n"
+        "Load the `professional-report` skill before finalizing to get the full report structure. "
+        "Your final output must include:\n"
         "- Executive summary\n"
         "- Attack chains (list of strings)\n"
-        "- Reproduction plan (step by step)\n"
+        "- Reproduction plan (step by step with exact curl commands)\n"
         "- Analysis limitations\n"
         "- Next steps / recommendations\n"
         "- Benchmark (findings_covered, paths_exercised, confidence_average, benchmark_summary)\n"
-        "- Finding overrides with evidence for each confirmed vulnerability"
+        "- Finding overrides with evidence for each confirmed vulnerability\n"
+        "- Coverage summary (what was tested, what was not)"
     )
 
 

@@ -59,7 +59,7 @@ export function RepoOverviewScreen({
                 {session.session.repositorySummary || "This surface summarizes repository structure, framework signals, graph hints, and security segmentation for the active security run."}
               </p>
             </div>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {session.session.targetType} target
             </span>
           </div>
@@ -197,7 +197,7 @@ export function RepoOverviewScreen({
             {dedupedRepoHotspotFeed?.map((item) => (
               <div
                 key={`${item.sessionId}-${item.hotspotClass}-${item.label}`}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -235,7 +235,7 @@ export function RepoOverviewScreen({
             {hotspots.map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -269,7 +269,7 @@ export function RepoOverviewScreen({
             {ledgerItems.map((item) => (
               <div
                 key={`${item.ledgerClass}-${item.label}`}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -337,7 +337,7 @@ function OverviewTable({
       ) : (
         <div className="mt-3 space-y-2">
           {rows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between gap-3 rounded-xl bg-[#fbf7f1] px-4 py-3">
+            <div key={row.label} className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f7f7] px-4 py-3">
               <span className="text-sm text-txt-secondary">{row.label}</span>
               <span className="text-right text-sm font-medium text-txt-primary">{row.value}</span>
             </div>

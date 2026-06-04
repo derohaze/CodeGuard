@@ -31,6 +31,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
   const surfacedValidatedFindings = orderedValidatedFindings.filter((finding) => !approvalQueuedFindingIds.has(finding.id));
   const activeFindingCounts = countSeverities(surfacedValidatedFindings);
   const activeValidatedCount = surfacedValidatedFindings.length;
+  const hasAiScoreExplanation = Boolean(toAnalystCopy(analysisBrief?.scoreExplanation ?? "").trim());
   const scoreExplanation = buildScoreExplanation(session, {
     activeValidatedCount,
     approvalQueueCount: approvalQueue.length,
@@ -39,8 +40,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
   const showWorkflowDetails = hasMeaningfulWorkflowDetails(session);
   const showTechnicalSignals = hasMeaningfulTechnicalSignals(session);
   const hasAnalysisBrief = Boolean(
-    analysisBrief?.scoreExplanation
-      || analysisBrief?.potentialRisks.length
+    analysisBrief?.potentialRisks.length
       || analysisBrief?.securityObservations.length
       || analysisBrief?.analysisLimitations.length
       || analysisBrief?.attackThinking.length
@@ -102,7 +102,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
           style={{ borderColor: "hsl(var(--border-soft))" }}
         >
           <div className="grid gap-3 xl:grid-cols-[280px_1fr] xl:items-stretch">
-            <div className="rounded-lg border bg-[#f6f1e8] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+            <div className="rounded-lg border bg-[#f4f4f5] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
               <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">Security score</p>
               <div className="mt-2 flex items-end gap-2">
                 <span className="text-[34px] font-semibold leading-none tracking-[-0.05em] text-txt-primary">
@@ -110,13 +110,13 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
                 </span>
                 <span className="pb-0.5 text-xs text-txt-tertiary">{hasSecurityScore ? "/100" : "unavailable"}</span>
               </div>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#ded4c6]">
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#d4d4d4]">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${hasSecurityScore ? session.session.securityScore : 0}%` }} />
               </div>
             </div>
 
             <div className="rounded-lg border bg-card px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
-              <p className="text-sm font-semibold text-txt-primary">What this score means</p>
+              <p className="text-sm font-semibold text-txt-primary">{hasAiScoreExplanation ? "AI score explanation" : "Score signals"}</p>
               <div className="mt-3 space-y-2 text-sm leading-6 text-txt-secondary">
                 {scoreExplanation.map((item) => (
                   <p key={item}>{item}</p>
@@ -154,7 +154,7 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
             <span>Elapsed: {formatElapsedSeconds(session.session.elapsedSeconds)}</span>
           </div>
           {excludedFiles.length > 0 && (
-            <div className="mt-4 rounded-lg border bg-[#f6f1e8] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+            <div className="mt-4 rounded-lg border bg-[#f4f4f5] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-txt-tertiary">Excluded files</p>
               <div className="mt-2 space-y-1.5 text-sm text-txt-secondary">
                 {excludedFiles.slice(0, 6).map((item) => (
@@ -368,11 +368,6 @@ export function ScanResultsScreen({ session, onSelectFinding }: Props) {
             className="grid gap-3 md:grid-cols-2"
           >
             <AnalystListCard
-              label="Score meaning"
-              intro={analysisBrief.scoreExplanation}
-              items={[]}
-            />
-            <AnalystListCard
               label="Potential risks"
               intro="Unconfirmed concerns derived from reviewed evidence, missing verification, or suspicious patterns."
               items={analysisBrief.potentialRisks}
@@ -508,35 +503,77 @@ function buildScoreExplanation(
   counts: { activeValidatedCount: number; approvalQueueCount: number; candidateCount: number },
 ): string[] {
   const score = session.session.securityScore;
-  const coveragePercent = Number(session.session.scoreRationale?.coverage_percent ?? session.session.coveragePercent);
-  const candidatePressure = Number(session.session.scoreRationale?.candidate_pressure ?? counts.candidateCount);
+  const rationale = session.session.scoreRationale ?? {};
+  const coveragePercent = Number(rationale.coverage_percent ?? session.session.coveragePercent);
+  const candidatePressure = Number(rationale.candidate_pressure ?? counts.candidateCount);
+  const candidateFindingsCount = Number(rationale.candidate_findings_count ?? counts.candidateCount);
+  const validatedFindingsCount = Number(rationale.validated_findings_count ?? counts.activeValidatedCount);
+  const pathCount = Number(rationale.path_count ?? session.session.pathSummary?.candidate_path_count ?? session.session.totalPathsCount);
+  const emptyPathPenalty = Number(rationale.empty_path_penalty ?? 0);
+  const unsupportedPenalty = Number(rationale.unsupported_penalty ?? 0);
+  const lowSignalPenalty = Number(rationale.low_signal_penalty ?? 0);
+  const coverageBand = readableValue(rationale.coverage_band);
+  const supportPrimary = getScoreSupportPrimary(rationale.support_matrix);
+  const aiScoreExplanation = toAnalystCopy(session.session.analysisBrief?.scoreExplanation ?? "");
   const explanations: string[] = [];
 
-  if (typeof score === "number") {
-    explanations.push(`${score}/100 is the confidence score for this saved run, not a finding count.`);
+  if (aiScoreExplanation) {
+    explanations.push(aiScoreExplanation);
+  } else if (typeof score === "number") {
+    const scoreInputs = [
+      `${score}/100 score`,
+      `${coveragePercent}% coverage`,
+      `${validatedFindingsCount} validated finding(s)`,
+      `${candidateFindingsCount} candidate finding(s)`,
+      `${pathCount} candidate path(s)`,
+    ];
+    if (coverageBand) {
+      scoreInputs.push(`${coverageBand} coverage band`);
+    }
+    if (supportPrimary) {
+      scoreInputs.push(`${supportPrimary.stack} support: ${supportPrimary.confidence}`);
+    }
+    explanations.push(`Score inputs from this run: ${scoreInputs.join(", ")}.`);
   } else {
-    explanations.push("No score was produced for this run.");
+    explanations.push("This run did not return a score from the backend.");
   }
 
-  if (counts.activeValidatedCount === 0) {
-    explanations.push("No confirmed high-confidence vulnerability is currently open in this scope.");
-  } else {
-    explanations.push(`${counts.activeValidatedCount} confirmed finding(s) still need review or remediation.`);
+  const reductions = [
+    emptyPathPenalty > 0 ? `empty path inventory -${emptyPathPenalty}` : null,
+    unsupportedPenalty > 0 ? `framework support -${unsupportedPenalty}` : null,
+    lowSignalPenalty > 0 ? `low evidence signal -${lowSignalPenalty}` : null,
+    candidatePressure > 0 ? `candidate pressure -${candidatePressure}` : null,
+  ].filter(Boolean);
+  if (reductions.length > 0) {
+    explanations.push(`Score reductions recorded by the scorer: ${reductions.join(", ")}.`);
   }
 
-  if (coveragePercent < 100) {
-    explanations.push(`The score is capped by partial coverage: ${coveragePercent}% of the selected scope was reviewed.`);
-  } else if (typeof score === "number" && score < 100 && counts.activeValidatedCount === 0) {
-    explanations.push("The remaining gap is residual uncertainty from conservative analysis, not a confirmed bug.");
+  if (counts.activeValidatedCount > 0 || counts.approvalQueueCount > 0 || candidateFindingsCount > 0) {
+    explanations.push(`Current review state: ${counts.activeValidatedCount} open finding(s), ${counts.approvalQueueCount} queued approval item(s), ${candidateFindingsCount} candidate finding(s).`);
   }
 
-  if (counts.approvalQueueCount > 0 || candidatePressure > 0) {
-    explanations.push(`${counts.approvalQueueCount} approval item(s) and ${candidatePressure} candidate signal(s) still affect confidence.`);
-  } else {
-    explanations.push("There is no queued approval item or candidate signal blocking this result.");
+  if (explanations.length === 1 && typeof score === "number") {
+    explanations.push(`Reviewed evidence summary: ${coveragePercent}% coverage, ${pathCount} candidate path(s), ${validatedFindingsCount} validated finding(s).`);
   }
 
   return explanations;
+}
+
+function getScoreSupportPrimary(value: unknown): { stack: string; confidence: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const primary = (value as Record<string, unknown>).primary;
+  if (!primary || typeof primary !== "object") return null;
+  const primaryRecord = primary as Record<string, unknown>;
+  const stack = readableValue(primaryRecord.stack);
+  const confidence = readableValue(primaryRecord.confidence);
+  if (!stack || !confidence) return null;
+  return { stack, confidence };
+}
+
+function readableValue(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[_-]+/g, " ")
+    .trim();
 }
 
 function hasMeaningfulWorkflowDetails(session: ScanSessionDetail): boolean {
@@ -678,11 +715,11 @@ function ScoreIssueChip({
       : tone === "high"
         ? "text-status-high"
         : tone === "medium"
-          ? "text-[#9a7d57]"
-          : "text-[#8f877a]";
+          ? "text-[#525252]"
+          : "text-[#666666]";
 
   return (
-    <div className="min-w-0 rounded-lg border bg-[#f6f1e8] px-3 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="min-w-0 rounded-lg border bg-[#f4f4f5] px-3 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <div className="mt-3 flex min-h-[44px] items-center justify-center">
         <span
@@ -746,7 +783,7 @@ function AnalystListCard({
 }
 
 function AnnotationRow({ annotation }: { annotation: SessionAnnotation }) {
-  const toneClass = annotation.tone === "red" ? "bg-[#fff6f4] text-status-critical" : "bg-[#fbf7ee] text-status-high";
+  const toneClass = annotation.tone === "red" ? "bg-[#fff6f4] text-status-critical" : "bg-[#f4f4f5] text-status-high";
   return (
     <div className="rounded-lg border px-3 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <div className="flex items-start justify-between gap-3">

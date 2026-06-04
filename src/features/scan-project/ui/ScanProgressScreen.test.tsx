@@ -174,4 +174,79 @@ describe("ScanProgressScreen", () => {
     expect(screen.getByText("Path tracing ran but found no source-to-sink candidates in this run.")).toBeInTheDocument();
     expect(screen.queryByText("0/0 paths")).not.toBeInTheDocument();
   });
+
+  it("does not show a zero-over-zero path count while path review is waiting for inventory", () => {
+    const session = {
+      verdict: null,
+      findings: [],
+      candidateFindings: [],
+      issues: { critical: 0, high: 0, medium: 0, low: 0 },
+      errorMessage: null,
+      completedAt: null,
+      session: {
+        id: "session-review-pending",
+        title: "Scan backend",
+        repo: "backend",
+        time: "2026-04-13 01:00 UTC",
+        unread: false,
+        status: "scanning",
+        preview: "preview",
+        scanMode: "deep",
+        criticalCount: 0,
+        warningCount: 0,
+        findingsCount: 0,
+        candidateFindingsCount: 0,
+        progress: 44,
+        phaseProgress: 10,
+        progressMessage: "Preparing path review",
+        currentPhase: "Reviewing paths",
+        elapsedSeconds: 2,
+        progressLogs: [],
+        progressCounters: null,
+        runtimeMetrics: null,
+        scanPlan: null,
+        repositorySummary: null,
+        repositoryInventory: null,
+        frameworkProfile: null,
+        repositoryGraph: null,
+        graphSummary: null,
+        securityRegistry: null,
+        segmentationSummary: null,
+        pathInventory: null,
+        pathSummary: null,
+        reviewQueueSummary: null,
+        annotations: [],
+        annotationSummary: null,
+        coverageSnapshot: null,
+        coverageSummary: null,
+        coveragePercent: 0,
+        reviewedFilesCount: 0,
+        eligibleFilesCount: 0,
+        reviewedBlocksCount: 0,
+        totalBlocksCount: 0,
+        reviewedLinesCount: 0,
+        totalLinesCount: 0,
+        tracedPathsCount: 0,
+        totalPathsCount: 0,
+        skippedFilesCount: 0,
+        highRiskFilesCount: 0,
+        isSafe: null,
+        securityScore: null,
+        scoreRationale: null,
+        targetType: "folder",
+        sourcePath: "D:/repo",
+        preset: "balanced",
+        createdAt: "2026-04-13T00:00:00Z",
+        updatedAt: "2026-04-13T00:00:00Z",
+        lastVerification: null,
+        workflowSummary: null,
+      },
+    } as unknown as ScanSessionDetail;
+
+    render(<ScanProgressScreen session={session} />);
+
+    expect(screen.getByText("Path review pending")).toBeInTheDocument();
+    expect(screen.getByText("Review starts after path inventory is available.")).toBeInTheDocument();
+    expect(screen.queryByText("0/0 paths")).not.toBeInTheDocument();
+  });
 });

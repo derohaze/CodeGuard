@@ -25,6 +25,8 @@ const scanPresets = [
   },
 ] as const;
 
+const INTERACTIVE_MODE_KEY = "aegix.interactiveMode";
+
 type HomeScreenDefaults = {
   preset: (typeof scanPresets)[number]["id"];
   scanMode: "fast" | "deep";
@@ -38,6 +40,7 @@ export function useHomeScreen(defaults?: HomeScreenDefaults) {
   const canBrowse = typeof window !== "undefined" && typeof window.electronAPI?.pickPath === "function";
   const [preset, setPresetState] = useState<(typeof scanPresets)[number]["id"]>(resolvedDefaults.preset);
   const [scanMode, setScanModeState] = useState<"fast" | "deep">(resolvedDefaults.scanMode);
+  const [interactive, setInteractiveState] = useState(() => readInteractiveDefault());
   const [targetType, setTargetType] = useState<SourceTargetType>("folder");
   const [targetPath, setTargetPath] = useState("");
   const [loading, setLoading] = useState(false);
@@ -129,10 +132,18 @@ export function useHomeScreen(defaults?: HomeScreenDefaults) {
     setScanModeState(value);
   };
 
+  const setInteractive = (value: boolean) => {
+    setInteractiveState(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(INTERACTIVE_MODE_KEY, value ? "on" : "off");
+    }
+  };
+
   return {
     canBrowse,
     clearRecentSources,
     inferredWorkspace,
+    interactive,
     loading,
     pickPath,
     pickingPath,
@@ -144,6 +155,7 @@ export function useHomeScreen(defaults?: HomeScreenDefaults) {
     scanSummary,
     selectedPreset,
     selectedTargetName,
+    setInteractive,
     setLoading,
     setPreset,
     setScanMode,
@@ -152,6 +164,14 @@ export function useHomeScreen(defaults?: HomeScreenDefaults) {
     targetPath,
     targetType,
   };
+}
+
+function readInteractiveDefault() {
+  if (typeof window === "undefined") return true;
+  const stored = window.localStorage.getItem(INTERACTIVE_MODE_KEY);
+  if (stored === "off") return false;
+  if (stored === "on") return true;
+  return true;
 }
 
 function basenameFromPath(path: string) {

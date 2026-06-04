@@ -156,7 +156,7 @@ export function ApprovalQueueScreen({ session, onSelectFinding, onOpenResults }:
 
 function SummaryChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border bg-[#f6f1e8] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-lg border bg-[#f4f4f5] px-4 py-3" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <div className="mt-3 flex items-center gap-2">
         <CheckCircle2 size={15} className="text-status-success" />
@@ -181,7 +181,7 @@ function EmptyQueueCard({
       style={{ borderColor: "hsl(var(--border-soft))" }}
     >
       <div className="flex items-start gap-3">
-        <div className="rounded-lg border bg-[#f6f1e8] p-2.5 text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+        <div className="rounded-lg border bg-[#f4f4f5] p-2.5 text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
           <Inbox size={16} />
         </div>
         <div className="min-w-0">

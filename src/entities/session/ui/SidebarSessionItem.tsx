@@ -77,7 +77,7 @@ export function SidebarSessionItem({ session, index, isActive = false, onClick, 
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="rounded-xl border border-border-soft bg-surface p-1 text-txt-primary shadow-[0_16px_36px_rgba(52,42,28,0.1)]"
+                  className="rounded-xl border border-border-soft bg-surface p-1 text-txt-primary shadow-[0_16px_36px_rgba(0,0,0,0.1)]"
                 >
                   <DropdownMenuItem
                     onClick={(event) => {
@@ -111,7 +111,7 @@ export function SidebarSessionItem({ session, index, isActive = false, onClick, 
         </div>
       </HoverCardTrigger>
 
-      <HoverCardContent side="right" align="start" sideOffset={12} avoidCollisions={false} className="pointer-events-none z-30 w-[270px] rounded-[18px] border border-border-soft bg-surface p-4 shadow-[0_18px_40px_rgba(52,42,28,0.12)]">
+      <HoverCardContent side="right" align="start" sideOffset={12} avoidCollisions={false} className="pointer-events-none z-30 w-[270px] rounded-[18px] border border-border-soft bg-surface p-4 shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

@@ -32,6 +32,7 @@ class StartScanUseCase:
             target_type=request.target_type,
             preset=request.preset,
             scan_mode=request.scan_mode,
+            interactive=request.interactive,
         )
         await self._reconcile_stale_active_jobs(limit=max(settings.global_concurrent_scans_limit * 4, 200))
         active_jobs = await self.job_repository.count_active()

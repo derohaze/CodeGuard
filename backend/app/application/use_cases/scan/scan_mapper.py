@@ -111,6 +111,7 @@ def map_session_summary(entity: ScanSessionEntity) -> SessionSummaryResponse:
         skipped_files_count=entity.skipped_files_count,
         high_risk_files_count=entity.high_risk_files_count,
         is_safe=entity.is_safe,
+        interactive=entity.interactive,
         security_score=entity.security_score,
         score_rationale=entity.score_rationale,
         target_type=entity.target_type,

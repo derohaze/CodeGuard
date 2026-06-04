@@ -37,7 +37,7 @@ export function BuilderStructuredMessage({
       className={cn(
         "space-y-3.5 text-[14px] leading-7 text-start",
         isInverted &&
-          "text-white [&_a]:text-[#f5d2a5] [&_code]:bg-white/10 [&_code]:text-white [&_blockquote]:border-white/20",
+          "text-white [&_a]:text-[#e5e5e5] [&_code]:bg-white/10 [&_code]:text-white [&_blockquote]:border-white/20",
       )}
       style={{ unicodeBidi: "plaintext" }}
     >
@@ -90,7 +90,7 @@ function RenderedBlock({
           className={cn(
             "space-y-2 ps-6 text-txt-primary marker:text-[#94652a]",
             block.ordered ? "list-decimal" : "list-disc",
-            isInverted && "text-white marker:text-[#f5d2a5]",
+            isInverted && "text-white marker:text-[#e5e5e5]",
           )}
         >
           {block.items.map((item) => (
@@ -149,7 +149,7 @@ function RenderedBlock({
                     <TableHead
                       key={header}
                       className={cn(
-                        "h-11 px-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#7d7467]",
+                        "h-11 px-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#666666]",
                         isInverted && "text-[#e8dccd]",
                       )}
                     >
@@ -163,7 +163,7 @@ function RenderedBlock({
                   <TableRow
                     key={`${rowIndex}-${row.join("|")}`}
                     className={cn(
-                      "border-border-soft bg-transparent hover:bg-[#faf6ef]",
+                      "border-border-soft bg-transparent hover:bg-[#f7f7f7]",
                       isInverted && "border-white/10 hover:bg-white/5",
                     )}
                   >

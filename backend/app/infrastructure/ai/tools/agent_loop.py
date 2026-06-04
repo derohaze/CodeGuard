@@ -78,7 +78,15 @@ class InteractiveAgentLoop:
                 })
 
                 if tc["name"] == "load_skill" and result.success:
-                    self._handle_skill_activation(tc.get("arguments", {}))
+                    args_raw = tc.get("arguments", "{}")
+                    if isinstance(args_raw, str):
+                        try:
+                            parsed_args = json.loads(args_raw)
+                        except json.JSONDecodeError:
+                            parsed_args = {}
+                    else:
+                        parsed_args = args_raw or {}
+                    self._handle_skill_activation(parsed_args)
 
         raise MaxStepsError(MAX_STEPS)
 
@@ -91,7 +99,23 @@ class InteractiveAgentLoop:
         return bool(msg.get("tool_calls"))
 
     def _get_tool_calls(self, msg: dict) -> list[dict]:
-        return msg.get("tool_calls", [])
+        raw = msg.get("tool_calls", [])
+        # Normalize OpenAI format (function nested) to flat format (name at top level)
+        normalized = []
+        for tc in raw:
+            if not isinstance(tc, dict):
+                continue
+            fn = tc.get("function", {})
+            if isinstance(fn, dict) and fn.get("name"):
+                normalized.append({
+                    "id": tc.get("id", ""),
+                    "name": fn["name"],
+                    "arguments": fn.get("arguments", "{}"),
+                    "type": tc.get("type", "function"),
+                })
+            else:
+                normalized.append(tc)
+        return normalized
 
     async def _execute_tool_call(self, tc: dict) -> ToolResult:
         name = tc.get("name", "")

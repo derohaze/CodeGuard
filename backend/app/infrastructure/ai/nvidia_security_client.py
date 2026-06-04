@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import json
 from dataclasses import dataclass
 import logging
+import time
 from textwrap import shorten
 
 import httpx
@@ -24,6 +27,9 @@ from app.infrastructure.ai.orchestration.model_router import ModelRouter
 from app.infrastructure.ai.prompt_loader import load_prompt_pack
 
 logger = logging.getLogger("aegix.ai")
+
+_RATE_LIMIT_FALLBACK_COOLDOWN_SECONDS = 30.0
+_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 60.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,15 +61,33 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         self.retry_attempts = settings.nvidia_retry_attempts
         self.retry_backoff_seconds = settings.nvidia_retry_backoff_seconds
         self._api_key_cursor = 0
+        self._rate_limit_cooldown_until = 0.0
+        self._runtime_events: list[str] = []
+        self._runtime_metrics: dict[str, int] = {}
 
     @staticmethod
     def is_configured(settings) -> bool:
         return bool(_resolve_nvidia_api_keys(settings))
 
+    def reset_runtime_state(self) -> None:
+        self._runtime_events = []
+        self._runtime_metrics = {}
+
+    def drain_runtime_events(self) -> list[str]:
+        events = list(self._runtime_events)
+        self._runtime_events.clear()
+        return events
+
+    def snapshot_runtime_metrics(self, *, reset: bool = False) -> dict | None:
+        metrics = dict(self._runtime_metrics)
+        if reset:
+            self._runtime_metrics = {}
+        return metrics or None
+
     async def map_repository(self, project_name: str, source_path: str, repository_profile: dict, repository_artifacts: dict, preset: str) -> dict:
         parsed = await self._chat_json(
             task_name="repository_map",
-            max_tokens=1024,
+            max_tokens=4096,
             messages=[
                 {"role": "system", "content": load_prompt_pack("repository_mapper.md")},
                 {
@@ -91,7 +115,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             return {"review_note": "No prioritized work items reached the path reviewer.", "repository_summary": "", "findings": []}
         parsed = await self._chat_json(
             task_name="path_review",
-            max_tokens=1536,
+            max_tokens=4096,
             messages=[
                 {"role": "system", "content": load_prompt_pack("path_reviewer.md")},
                 {
@@ -115,7 +139,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             return {"review_note": "The validator did not receive any candidate findings.", "safe_summary": "No confirmed high-confidence issue was found in the reviewed scope.", "findings": []}
         parsed = await self._chat_json(
             task_name="finding_validate",
-            max_tokens=1536,
+            max_tokens=4096,
             messages=[
                 {"role": "system", "content": load_prompt_pack("finding_validator.md")},
                 {
@@ -141,7 +165,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
     async def summarize_verdict(self, project_name: str, source_path: str, repository_profile: dict, repository_map: dict, findings: list[dict], security_score: int | None, preset: str) -> dict:
         parsed = await self._chat_json(
             task_name="verdict",
-            max_tokens=768,
+            max_tokens=4096,
             messages=[
                 {"role": "system", "content": load_prompt_pack("verdict_analyst.md")},
                 {
@@ -187,12 +211,12 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         parsed: dict | None = None
         attempt_profiles = (
             {
-                "max_tokens": 2048,
+                "max_tokens": 4096,
                 "findings_limit": 20,
                 "repository_map": penetration_context.get("repository_map", {}),
             },
             {
-                "max_tokens": 1536,
+                "max_tokens": 4096,
                 "findings_limit": 12,
                 "repository_map": _compact_penetration_repository_map(penetration_context.get("repository_map", {})),
             },
@@ -326,7 +350,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
     async def explain_finding(self, remediation_context: dict) -> dict:
         parsed = await self._chat_json(
             task_name="explain",
-            max_tokens=1024,
+            max_tokens=2048,
             messages=[
                 {"role": "system", "content": load_prompt_pack("explain_prompt.md")},
                 {"role": "user", "content": f"Remediation context JSON: {json_for_task_prompt('explain', 'remediation_context', remediation_context, max_chars=2600)}"},
@@ -347,7 +371,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
     async def draft_fix_strategies(self, remediation_context: dict, mode: str) -> dict:
         parsed = await self._chat_json(
             task_name="fix_draft",
-            max_tokens=1536,
+            max_tokens=3072,
             messages=[
                 {"role": "system", "content": load_prompt_pack("fix_prompt.md")},
                 {"role": "user", "content": f"Mode: {mode}\nRemediation context JSON: {json_for_task_prompt('fix_draft', 'remediation_context', remediation_context, max_chars=2800)}"},
@@ -358,7 +382,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
     async def validate_remediation(self, remediation_context: dict, remediation_draft: dict, mode: str) -> dict:
         parsed = await self._chat_json(
             task_name="fix_validate",
-            max_tokens=1536,
+            max_tokens=3072,
             messages=[
                 {"role": "system", "content": load_prompt_pack("fix_validator_prompt.md")},
                 {
@@ -381,7 +405,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
 
     async def _chat_json(self, *, task_name: str, max_tokens: int, messages: list[dict]) -> dict:
         token_budgets = [max_tokens]
-        expanded_budget = min(max(max_tokens * 2, 1536), 4096)
+        expanded_budget = min(max(max_tokens * 2, 1536), 16384)
         if expanded_budget > max_tokens:
             token_budgets.append(expanded_budget)
         raw_responses: list[str] = []
@@ -401,7 +425,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
 
         # Some OpenAI-compatible providers ignore response_format and return fenced or prose-wrapped JSON.
         fallback_messages = _force_json_only_messages(messages)
-        fallback_budget = min(max(max_tokens * 2, 1536), 4096)
+        fallback_budget = min(max(max_tokens * 2, 1536), 16384)
         content = await self._chat_text(task_name=task_name, max_tokens=fallback_budget, messages=fallback_messages, expect_json=False)
         if content:
             raw_responses.append(content)
@@ -422,6 +446,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
 
     async def _chat_text(self, *, task_name: str, max_tokens: int, messages: list[dict], expect_json: bool = False, target: _ProviderTarget | None = None) -> str:
         target = target or self._target_for_task(task_name)
+        self._raise_if_rate_limited(target)
         payload = {
             "model": target.model,
             "messages": messages,
@@ -486,7 +511,10 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
                         raise last_error from exc
                 except httpx.HTTPStatusError as exc:
                     last_error = _map_provider_http_error(target.provider_name, exc.response)
+                    self._record_rate_limit_if_needed(last_error)
                     if not _should_try_next_key(last_error):
+                        raise last_error from exc
+                    if last_error.failure_kind == "rate_limit" and last_error.retry_after_seconds is None and len(ordered_api_keys) <= 1:
                         raise last_error from exc
                     if len(ordered_api_keys) > 1:
                         continue
@@ -510,8 +538,9 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
                 break
             if round_index >= total_rounds - 1 or not last_error.retryable:
                 raise last_error
-            if self.retry_backoff_seconds > 0:
-                await asyncio.sleep(min(self.retry_backoff_seconds * (2**round_index), 15.0))
+            delay_seconds = _retry_delay_seconds(last_error, self.retry_backoff_seconds * (2**round_index))
+            if delay_seconds > 0:
+                await asyncio.sleep(delay_seconds)
 
         if body is None:
             if last_error is not None:
@@ -550,6 +579,7 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         tools: list[dict] | None = None,
     ) -> dict:
         target = self._target_for_task(task_name)
+        self._raise_if_rate_limited(target)
         payload: dict[str, object] = {
             "model": target.model,
             "messages": messages,
@@ -588,7 +618,9 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
                     if round_index >= total_rounds - 1: raise last_error from exc
                 except httpx.HTTPStatusError as exc:
                     last_error = _map_provider_http_error(target.provider_name, exc.response)
+                    self._record_rate_limit_if_needed(last_error)
                     if not _should_try_next_key(last_error): raise last_error from exc
+                    if last_error.failure_kind == "rate_limit" and last_error.retry_after_seconds is None and len(ordered_api_keys) <= 1: raise last_error from exc
                     if len(ordered_api_keys) > 1: continue
                     if round_index >= total_rounds - 1: raise last_error from exc
                 except httpx.HTTPError as exc:
@@ -602,8 +634,9 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
             if body is not None: break
             if last_error is None: break
             if round_index >= total_rounds - 1 or not last_error.retryable: raise last_error
-            if self.retry_backoff_seconds > 0:
-                await asyncio.sleep(min(self.retry_backoff_seconds * (2**round_index), 15.0))
+            delay_seconds = _retry_delay_seconds(last_error, self.retry_backoff_seconds * (2**round_index))
+            if delay_seconds > 0:
+                await asyncio.sleep(delay_seconds)
 
         if body is None:
             raise last_error or ExternalAIServiceError(
@@ -671,6 +704,28 @@ class NvidiaSecurityClient(SecurityAnalysisAIClient):
         cursor = self._api_key_cursor % len(api_keys)
         self._api_key_cursor = (cursor + 1) % len(api_keys)
         return [*api_keys[cursor:], *api_keys[:cursor]]
+
+    def _raise_if_rate_limited(self, target: _ProviderTarget) -> None:
+        remaining_seconds = self._rate_limit_cooldown_until - time.monotonic()
+        if remaining_seconds <= 0:
+            return
+        self._runtime_metrics["rate_limit_short_circuits"] = self._runtime_metrics.get("rate_limit_short_circuits", 0) + 1
+        raise ExternalAIServiceError(
+            f"NVIDIA rate limits are cooling down. Retry in {int(remaining_seconds) + 1} second(s).",
+            provider=target.provider_name,
+            retryable=True,
+            status_code=429,
+            failure_kind="rate_limit",
+            retry_after_seconds=remaining_seconds,
+        )
+
+    def _record_rate_limit_if_needed(self, error: ExternalAIServiceError) -> None:
+        if error.failure_kind != "rate_limit":
+            return
+        cooldown_seconds = _rate_limit_cooldown_seconds(error)
+        self._rate_limit_cooldown_until = max(self._rate_limit_cooldown_until, time.monotonic() + cooldown_seconds)
+        self._runtime_metrics["rate_limit_responses"] = self._runtime_metrics.get("rate_limit_responses", 0) + 1
+        self._runtime_events.append("AI provider rate limit cooldown activated; later scan stages will use deterministic fallbacks until it expires.")
 
 
 def _coerce_message_text(value) -> str:
@@ -817,6 +872,40 @@ def _extract_provider_message(body: dict | None) -> str:
     return "Unknown provider error."
 
 
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    value = response.headers.get("Retry-After")
+    if not value:
+        return None
+
+    stripped = value.strip()
+    try:
+        seconds = float(stripped)
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(stripped)
+        except (TypeError, ValueError, IndexError, OverflowError):
+            return None
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+        seconds = (retry_at - datetime.now(timezone.utc)).total_seconds()
+
+    if seconds <= 0:
+        return None
+    return min(seconds, _RATE_LIMIT_MAX_COOLDOWN_SECONDS)
+
+
+def _retry_delay_seconds(error: ExternalAIServiceError | None, fallback_seconds: float) -> float:
+    if error is not None and error.retry_after_seconds is not None:
+        return min(max(0.0, float(error.retry_after_seconds)), _RATE_LIMIT_MAX_COOLDOWN_SECONDS)
+    return min(max(0.0, float(fallback_seconds)), 15.0)
+
+
+def _rate_limit_cooldown_seconds(error: ExternalAIServiceError) -> float:
+    if error.retry_after_seconds is not None:
+        return min(max(0.0, float(error.retry_after_seconds)), _RATE_LIMIT_MAX_COOLDOWN_SECONDS)
+    return min(_RATE_LIMIT_FALLBACK_COOLDOWN_SECONDS, _RATE_LIMIT_MAX_COOLDOWN_SECONDS)
+
+
 def _chat_completions_url(base_url: str) -> str:
     normalized = base_url.rstrip("/")
     if normalized.endswith("/chat/completions"):
@@ -943,12 +1032,14 @@ def _map_provider_http_error(provider_name: str, response: httpx.Response) -> Ex
     provider_label = "NVIDIA"
 
     if status_code == 429:
+        retry_after_seconds = _retry_after_seconds(response)
         return ExternalAIServiceError(
             f"{provider_label} rate limits were reached while processing the request. Retry in a moment.",
             provider=provider_name,
             retryable=True,
             status_code=status_code,
             failure_kind="rate_limit",
+            retry_after_seconds=retry_after_seconds,
         )
     if status_code == 413 or "request too large" in normalized or "max tokens" in normalized or "context" in normalized:
         return ExternalAIServiceError(

@@ -120,6 +120,9 @@ class PenetrationTestAgent:
                 preset=penetration_context.get("preset", ""),
                 enable_thinking=getattr(self.ai_client, "enable_thinking", True),
             )
+            session_id = penetration_context.get("session_id")
+            if self.intelligence_store and history:
+                await self.learn_from_session(history, session_id=session_id)
             return self._extract_report_from_history(history)
 
         return await runner(penetration_context)

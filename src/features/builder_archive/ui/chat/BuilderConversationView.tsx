@@ -329,8 +329,8 @@ export function BuilderConversationView({
                       <ShinyText
                         text="Thinking"
                         className="leading-none"
-                        color="#7a6f62"
-                        shineColor="#fff7ed"
+                        color="#737373"
+                        shineColor="#ffffff"
                         speed={2.2}
                         spread={70}
                         direction="left"
@@ -352,7 +352,7 @@ export function BuilderConversationView({
               type="button"
               onClick={jumpToBottomQuick}
               aria-label="Jump to latest message"
-              className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border bg-card text-txt-primary shadow-[0_12px_24px_rgba(52,42,28,0.12)] transition-colors hover:bg-surface"
+              className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border bg-card text-txt-primary shadow-[0_12px_24px_rgba(0,0,0,0.12)] transition-colors hover:bg-surface"
               style={{ borderColor: "hsl(var(--border-soft))" }}
             >
               <ChevronDown size={18} />

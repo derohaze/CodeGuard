@@ -1239,7 +1239,7 @@ export default function Page() {
           setDeleteTarget(null);
         }
       }}>
-        <AlertDialogContent className="max-w-[420px] rounded-[28px] border border-border-soft bg-surface p-0 shadow-[0_28px_80px_rgba(52,42,28,0.14)]">
+        <AlertDialogContent className="max-w-[420px] rounded-[28px] border border-border-soft bg-surface p-0 shadow-[0_28px_80px_rgba(0,0,0,0.14)]">
           <div className="space-y-5 p-6">
             <AlertDialogHeader className="space-y-2 text-left">
               <AlertDialogTitle className="font-brand text-[26px] font-medium tracking-[-0.02em] text-txt-primary">

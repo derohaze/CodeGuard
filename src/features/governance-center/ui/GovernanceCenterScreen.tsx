@@ -52,7 +52,7 @@ export function GovernanceCenterScreen({ session }: Props) {
                 This surface summarizes approval pressure, policy posture, escalation load, and control requirements for the current security run.
               </p>
             </div>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {session.findings.length} governed finding{session.findings.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -178,14 +178,14 @@ export function GovernanceCenterScreen({ session }: Props) {
           </div>
           <div className="space-y-3">
             {governanceQueue.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+              <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
                 No governed findings currently require queue review.
               </div>
             ) : null}
             {governanceQueue.map(({ finding, decision, blockerClass, queuePriority, owner, nextReviewAction }) => (
                 <div
                   key={finding.id}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -226,7 +226,7 @@ export function GovernanceCenterScreen({ session }: Props) {
             {ledgerItems.map((item) => (
               <div
                 key={`${item.ledgerClass}-${item.label}`}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -295,7 +295,7 @@ function GovernanceTable({
       ) : (
         <div className="mt-3 space-y-2">
           {activeRows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between rounded-xl bg-[#fbf7f1] px-4 py-3">
+            <div key={row.label} className="flex items-center justify-between rounded-xl bg-[#f7f7f7] px-4 py-3">
               <span className="text-sm text-txt-secondary">{row.label}</span>
               <span className="text-sm font-semibold text-txt-primary">{row.value}</span>
             </div>

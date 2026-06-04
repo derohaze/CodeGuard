@@ -74,7 +74,7 @@ export function OperationsConsoleScreen({
                 This surface exposes the live workflow owner, handoff status, recovery path, and closure readiness for the current security run.
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {workflow.label}
             </span>
           </div>
@@ -399,7 +399,7 @@ export function OperationsConsoleScreen({
             {autonomySignals.map((item) => (
                 <div
                   key={`${item.signalClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -433,7 +433,7 @@ export function OperationsConsoleScreen({
             {selfHealingSignals.map((item) => (
                 <div
                   key={`${item.signalClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -467,7 +467,7 @@ export function OperationsConsoleScreen({
             {continuousExecutionCandidates.map((item) => (
                 <div
                   key={item.finding.id}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -517,7 +517,7 @@ export function OperationsConsoleScreen({
             {sessionMemoryLedger.map((item) => (
                 <div
                   key={`${item.memoryClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -551,7 +551,7 @@ export function OperationsConsoleScreen({
             {recoveryPlaybook.map((item) => (
                 <div
                   key={`${item.recoveryClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -587,7 +587,7 @@ export function OperationsConsoleScreen({
             {recommendationReuse.map((item) => (
                 <div
                   key={`${item.reuseClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -621,7 +621,7 @@ export function OperationsConsoleScreen({
             {memoryCarryForward.map((item) => (
                 <div
                   key={`${item.memoryClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -655,7 +655,7 @@ export function OperationsConsoleScreen({
             {continuousRemediation.map((item) => (
                 <div
                   key={`${item.workflowClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -689,7 +689,7 @@ export function OperationsConsoleScreen({
             {learningSignals.map((item) => (
                 <div
                   key={`${item.finding.id}-${item.signalClass}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -726,7 +726,7 @@ export function OperationsConsoleScreen({
             {controlDecisions.map((item) => (
                 <div
                   key={`${item.controlClass}-${item.label}`}
-                  className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                  className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -803,7 +803,7 @@ function OperationsRow({
   note?: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className="mt-2 text-sm leading-6 text-txt-primary">{value}</p>
       {note ? <p className="mt-2 text-xs leading-5 text-txt-secondary">{note}</p> : null}

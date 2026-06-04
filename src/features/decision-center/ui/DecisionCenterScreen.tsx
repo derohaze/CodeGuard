@@ -37,7 +37,7 @@ export function DecisionCenterScreen({ finding, onBack, onSuggestFix, onOpenPoli
                 {finding.file}:{finding.line}{finding.lineEnd > finding.line ? `-${finding.lineEnd}` : ""}
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {getRemediationStatusLabel(finding.remediationStatus)}
             </span>
           </div>
@@ -172,7 +172,7 @@ function DecisionCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border px-4 py-4 ${tone === "danger" ? "bg-[#fff7f5]" : tone === "warning" ? "bg-[#fbf7f1]" : "bg-card"} shadow-card`}
+      className={`rounded-2xl border px-4 py-4 ${tone === "danger" ? "bg-[#fff7f5]" : tone === "warning" ? "bg-[#f7f7f7]" : "bg-card"} shadow-card`}
       style={{ borderColor: "hsl(var(--border-soft))" }}
     >
       <div className="flex items-center gap-2 text-txt-secondary">
@@ -194,7 +194,7 @@ function DecisionRow({
   tone?: "default" | "danger";
 }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className={`mt-2 text-sm leading-6 ${tone === "danger" ? "text-status-critical" : "text-txt-secondary"}`}>{value}</p>
     </div>

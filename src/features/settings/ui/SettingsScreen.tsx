@@ -81,7 +81,7 @@ export function SettingsScreen({ onBack, settings, onPatchSettings, isSaving }: 
         </div>
       </aside>
 
-      <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto bg-[#fbf7f1]">
+      <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto bg-[#f7f7f7]">
         <div className="mx-auto flex w-full max-w-[960px] flex-col gap-6 px-10 py-10">
           <div className="flex items-center justify-between gap-6">
             <div>
@@ -91,7 +91,7 @@ export function SettingsScreen({ onBack, settings, onPatchSettings, isSaving }: 
           </div>
 
           <div
-            className="overflow-hidden rounded-[26px] border bg-card shadow-[0_18px_48px_rgba(52,42,28,0.08)]"
+            className="overflow-hidden rounded-[26px] border bg-card shadow-[0_18px_48px_rgba(0,0,0,0.08)]"
             style={{ borderColor: "hsl(var(--border-soft))" }}
           >
             <div className="border-b px-5 py-5" style={{ borderColor: "hsl(var(--border-soft))" }}>
@@ -285,9 +285,9 @@ function SettingsRow({
 }
 
 const selectClassName =
-  "h-11 w-[178px] rounded-xl border bg-[#f6f1ea] text-sm font-medium text-txt-primary focus:ring-0 focus:ring-offset-0";
+  "h-11 w-[178px] rounded-xl border bg-[#f4f4f5] text-sm font-medium text-txt-primary focus:ring-0 focus:ring-offset-0";
 
 const selectContentClassName =
-  "rounded-xl border border-border-soft bg-surface text-txt-primary shadow-[0_18px_40px_rgba(52,42,28,0.12)]";
+  "rounded-xl border border-border-soft bg-surface text-txt-primary shadow-[0_18px_40px_rgba(0,0,0,0.12)]";
 
 const selectItemClassName = "rounded-lg text-sm focus:bg-secondary focus:text-txt-primary";

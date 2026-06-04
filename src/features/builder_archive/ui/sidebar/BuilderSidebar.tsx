@@ -278,7 +278,7 @@ export function BuilderSidebar({
                 Filter, sort, and organize chats
               </TooltipContent>
             </Tooltip>
-            <PopoverContent align="end" sideOffset={10} className="w-[230px] rounded-[16px] border border-border-soft bg-surface p-1.5 shadow-[0_16px_36px_rgba(52,42,28,0.1)]">
+            <PopoverContent align="end" sideOffset={10} className="w-[230px] rounded-[16px] border border-border-soft bg-surface p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.1)]">
               <div className="px-1 py-1">
                 {buildFilterSections({
                   organizeMode,
@@ -345,7 +345,7 @@ export function BuilderSidebar({
               <Reorder.Item
                 key={group.id}
                 value={group.id}
-                whileDrag={{ scale: 1.015, boxShadow: "0 14px 28px rgba(52,42,28,0.12)" }}
+                whileDrag={{ scale: 1.015, boxShadow: "0 14px 28px rgba(0,0,0,0.12)" }}
                 transition={{ layout: { duration: 0 } }}
                 className="rounded-[16px] px-1.5 py-1"
                 onDragStart={() => setDraggedWorkspaceId(group.id)}
@@ -369,7 +369,7 @@ export function BuilderSidebar({
                   <Tooltip delayDuration={1000}>
                     <div className="min-w-0 flex-1">
                       <TooltipTrigger asChild>
-                        <button type="button" onClick={() => onToggleWorkspace(group.id)} className={`inline-block max-w-full truncate text-left text-[14px] text-[#7d7467] ${draggedWorkspaceId === group.id ? "cursor-grabbing" : "cursor-pointer active:cursor-grabbing"}`}>
+                        <button type="button" onClick={() => onToggleWorkspace(group.id)} className={`inline-block max-w-full truncate text-left text-[14px] text-[#666666] ${draggedWorkspaceId === group.id ? "cursor-grabbing" : "cursor-pointer active:cursor-grabbing"}`}>
                           {group.label}
                         </button>
                       </TooltipTrigger>
@@ -387,7 +387,7 @@ export function BuilderSidebar({
                             <Ellipsis size={14} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" sideOffset={8} className="w-[220px] rounded-[18px] border border-border-soft bg-surface p-2 text-txt-primary shadow-[0_18px_40px_rgba(52,42,28,0.12)]">
+                        <DropdownMenuContent align="end" sideOffset={8} className="w-[220px] rounded-[18px] border border-border-soft bg-surface p-2 text-txt-primary shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
                           <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onOpenWorkspaceInExplorer(group.id)}>Open in Explorer</DropdownMenuItem>
                           <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onCreatePermanentWorktree(group.id)}>Create permanent worktree</DropdownMenuItem>
                           <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onRenameWorkspace(group.id)}>Edit name</DropdownMenuItem>
@@ -448,7 +448,7 @@ export function BuilderSidebar({
                                           <Ellipsis size={14} />
                                         </button>
                                       </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" sideOffset={8} className="w-[200px] rounded-[18px] border border-border-soft bg-surface p-2 text-txt-primary shadow-[0_18px_40px_rgba(52,42,28,0.12)]">
+                                      <DropdownMenuContent align="end" sideOffset={8} className="w-[200px] rounded-[18px] border border-border-soft bg-surface p-2 text-txt-primary shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
                                         <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onRenameThread(thread.id)}>Edit name</DropdownMenuItem>
                                         <DropdownMenuItem className="rounded-xl text-sm focus:bg-secondary focus:text-txt-primary" onClick={() => onArchiveThread(thread.id)}>Archive chat</DropdownMenuItem>
                                         <DropdownMenuSeparator className="bg-border-soft" />
@@ -507,7 +507,7 @@ export function BuilderSidebar({
             setPendingDeleteTarget(null);
           }
         }}>
-          <AlertDialogContent className="max-w-[420px] rounded-[28px] border border-border-soft bg-surface p-0 shadow-[0_28px_80px_rgba(52,42,28,0.14)]">
+          <AlertDialogContent className="max-w-[420px] rounded-[28px] border border-border-soft bg-surface p-0 shadow-[0_28px_80px_rgba(0,0,0,0.14)]">
             <div className="space-y-5 p-6">
               <AlertDialogHeader className="space-y-2 text-left">
                 <AlertDialogTitle className="font-brand text-[26px] font-medium tracking-[-0.02em] text-txt-primary">

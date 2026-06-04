@@ -9,6 +9,7 @@ class StartScanRequest(BaseModel):
     target_type: Literal["folder", "file"]
     preset: Literal["safe", "balanced", "aggressive"] = "balanced"
     scan_mode: Literal["fast", "deep"] = "deep"
+    interactive: bool = True
 
 
 class AttackSimulationResponse(BaseModel):
@@ -154,6 +155,7 @@ class SessionSummaryResponse(BaseModel):
     target_type: Literal["folder", "file"]
     source_path: str
     preset: Literal["safe", "balanced", "aggressive"]
+    interactive: bool = True
     last_verification: dict | None = None
     latest_scan_job: ScanJobResponse | None = None
     workflow_summary: dict | None = None

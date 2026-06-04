@@ -84,7 +84,7 @@ export function ExportPatchScreen({
               <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-txt-primary">{finding.title}</h2>
               <p className="mt-2 truncate text-sm font-mono text-txt-tertiary">{snapshot.file}</p>
             </div>
-            <div className="rounded-full bg-[#eef8ef] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-status-success">
+            <div className="rounded-full bg-[#f4f4f5] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-status-success">
               Local export ready
             </div>
           </div>
@@ -135,7 +135,7 @@ export function ExportPatchScreen({
               Copy summary
             </button>
           </div>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#fbf7f1] px-4 py-4 text-[13px] leading-6 text-txt-secondary">
+          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#f7f7f7] px-4 py-4 text-[13px] leading-6 text-txt-secondary">
             {bundle.summaryText}
           </pre>
         </section>

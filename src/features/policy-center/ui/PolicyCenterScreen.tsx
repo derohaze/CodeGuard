@@ -43,7 +43,7 @@ export function PolicyCenterScreen({ finding, onBack, onSuggestFix }: Props) {
                 {finding.file}:{finding.line}{finding.lineEnd > finding.line ? `-${finding.lineEnd}` : ""}
               </p>
             </div>
-            <span className="rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {getRemediationStatusLabel(finding.remediationStatus)}
             </span>
           </div>
@@ -182,7 +182,7 @@ export function PolicyCenterScreen({ finding, onBack, onSuggestFix }: Props) {
           </div>
           <div className="space-y-3">
             {preMergeGuidance.map((item) => (
-              <div key={`${item.guidanceClass}-${item.label}`} className="rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+              <div key={`${item.guidanceClass}-${item.label}`} className="rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-txt-primary">{item.label}</p>
@@ -212,7 +212,7 @@ export function PolicyCenterScreen({ finding, onBack, onSuggestFix }: Props) {
             {preventionLedger.map((item) => (
               <div
                 key={`${item.ledgerClass}-${item.label}`}
-                className="rounded-2xl border bg-[#fbf7f1] px-4 py-4"
+                className="rounded-2xl border bg-[#f7f7f7] px-4 py-4"
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -270,7 +270,7 @@ function PolicyCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border px-4 py-4 ${tone === "block" ? "bg-[#fff7f5]" : tone === "review" ? "bg-[#fbf7f1]" : "bg-card"} shadow-card`}
+      className={`rounded-2xl border px-4 py-4 ${tone === "block" ? "bg-[#fff7f5]" : tone === "review" ? "bg-[#f7f7f7]" : "bg-card"} shadow-card`}
       style={{ borderColor: "hsl(var(--border-soft))" }}
     >
       <div className="flex items-center gap-2 text-txt-secondary">
@@ -292,7 +292,7 @@ function PolicyRow({
   tone?: "default" | "warning" | "danger";
 }) {
   return (
-    <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
+    <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4" style={{ borderColor: "hsl(var(--border-soft))" }}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-txt-tertiary">{label}</p>
       <p className={`mt-2 text-sm leading-6 ${tone === "danger" ? "text-status-critical" : tone === "warning" ? "text-status-high" : "text-txt-secondary"}`}>{value}</p>
     </div>

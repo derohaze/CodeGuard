@@ -65,7 +65,7 @@ export function TeamSecurityPostureScreen({
                 This surface summarizes security posture across the sessions currently tracked in the workspace, including recent risk load, score trends, and high-pressure repositories.
               </p>
             </div>
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#f4efe7] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#eeeeee] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-txt-secondary">
               {sessions.length} session{sessions.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -147,7 +147,7 @@ export function TeamSecurityPostureScreen({
             {topRiskSessions.map((session) => (
               <div
                 key={session.id}
-                className={`rounded-2xl border px-4 py-4 ${session.id === activeSessionId ? "bg-[#f8f3ea]" : "bg-[#fbf7f1]"}`}
+                className={`rounded-2xl border px-4 py-4 ${session.id === activeSessionId ? "bg-[#f2f2f2]" : "bg-[#f7f7f7]"}`}
                 style={{ borderColor: "hsl(var(--border-soft))" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -179,14 +179,14 @@ export function TeamSecurityPostureScreen({
           <div className="mt-3 space-y-3">
             {actionableTeamPostureFeed !== null ? (
               actionableTeamPostureFeed.length === 0 ? (
-                <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+                <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
                   No actionable workspace hotspot remains (all current items have zero findings).
                 </div>
               ) : (
                 actionableTeamPostureFeed.map((item) => (
                   <div
                     key={`${item.sessionId}-${item.hotspotClass}`}
-                    className={`rounded-2xl border px-4 py-4 ${item.sessionId === activeSessionId ? "bg-[#f8f3ea]" : "bg-[#fbf7f1]"}`}
+                    className={`rounded-2xl border px-4 py-4 ${item.sessionId === activeSessionId ? "bg-[#f2f2f2]" : "bg-[#f7f7f7]"}`}
                     style={{ borderColor: "hsl(var(--border-soft))" }}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -209,14 +209,14 @@ export function TeamSecurityPostureScreen({
                 ))
               )
             ) : postureHotspots.length === 0 ? (
-              <div className="rounded-2xl border bg-[#fbf7f1] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
+              <div className="rounded-2xl border bg-[#f7f7f7] px-4 py-4 text-sm text-txt-secondary" style={{ borderColor: "hsl(var(--border-soft))" }}>
                 No active workspace hotspot is currently blocking posture review.
               </div>
             ) : (
               postureHotspots.map((item) => (
                 <div
                   key={`${item.session.id}-${item.hotspotClass}`}
-                  className={`rounded-2xl border px-4 py-4 ${item.session.id === activeSessionId ? "bg-[#f8f3ea]" : "bg-[#fbf7f1]"}`}
+                  className={`rounded-2xl border px-4 py-4 ${item.session.id === activeSessionId ? "bg-[#f2f2f2]" : "bg-[#f7f7f7]"}`}
                   style={{ borderColor: "hsl(var(--border-soft))" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">

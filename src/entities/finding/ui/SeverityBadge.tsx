@@ -8,8 +8,8 @@ export function SeverityBadge({ severity }: Props) {
   const styles = {
     critical: "bg-status-critical-bg text-status-critical border-status-critical/20",
     high: "bg-status-high-bg text-status-high border-status-high/20",
-    medium: "bg-[#fbf7f1] text-[#9a7d57] border-[#e6d8c5]",
-    low: "bg-[#f6f1ea] text-[#8f877a] border-[#dfd2c1]",
+    medium: "bg-[#f7f7f7] text-[#525252] border-[#d4d4d4]",
+    low: "bg-[#f4f4f5] text-[#666666] border-[#d4d4d4]",
   };
 
   return (
